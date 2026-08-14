@@ -1,10 +1,14 @@
 """ASCII renderer — draw parsed graphs as terminal box-and-wire diagrams.
 
-Partially faithful port of the *visual* semantics of ``Graph::Easy::As_ascii``
-for the supported subset: nodes are boxed; joined components are placed on a
-shared horizontal band, separated by edge indicators (``-->``, ``<-``,
-``<-->``, or a labeled ``-- label -->``). Independent components stack on
-successive bands separated by a blank line.
+Port of the visual semantics of ``Graph::Easy::As_ascii`` for the supported
+subset, laid out on a character canvas:
+
+* nodes are boxed and grouped into horizontal layers (longest-path layering)
+* within a layer, nodes stack vertically
+* edges connect layers with ``-->`` / ``<--`` / ``<--->`` / ``--`` arrows;
+  vertical runs use ``|``; labelled edges write the label on the connector.
+
+Independent components render as separate stacked diagrams.
 """
 
 from __future__ import annotations
@@ -13,6 +17,8 @@ from collections import deque
 
 from graph_easy.node import Node
 from graph_easy.parser import Edge, Graph
+
+_CHANNEL = 9
 
 
 def _box(node: Node) -> list[str]:
@@ -37,18 +43,6 @@ def _box(node: Node) -> list[str]:
     return rows
 
 
-def _edge_str(edge: Edge) -> str:
-    if edge.label:
-        return f"-- {edge.label} -->"
-    if edge.directed_from_source and edge.directed_to_target:
-        return "<-->"
-    if edge.directed_from_source:
-        return "<--"
-    if edge.directed_to_target:
-        return "-->"
-    return "--"
-
-
 def _components(graph: Graph) -> list[list[str]]:
     """Split nodes into connected components (preserving insertion order)."""
     adj: dict[str, set[str]] = {n: set() for n in graph.nodes}
@@ -58,11 +52,6 @@ def _components(graph: Graph) -> list[list[str]]:
             adj[e.target].add(e.source)
     seen: set[str] = set()
     comps: list[list[str]] = []
-
-    def order(nodes: set[str]) -> None:
-        # stable: reuse global insertion order
-        pass
-
     for start in graph.nodes:
         if start in seen:
             continue
@@ -81,36 +70,90 @@ def _components(graph: Graph) -> list[list[str]]:
     return comps
 
 
-def _linearize(comp: list[str], graph: Graph) -> list[str]:
-    """Arrange one (traditionally chain-shaped) component left-to-right."""
-    indegree = {n: 0 for n in comp}
-    outs: dict[str, list[str]] = {}
-    for e in graph.edges:
-        if e.source in indegree and e.target in indegree:
-            outs.setdefault(e.source, []).append(e.target)
-            indegree[e.target] += 1
-    # Kahn topological order, preferring original insertion order
-    ready = [n for n in comp if indegree[n] == 0]
-    order: list[str] = []
-    while ready:
-        n = ready.pop(0)
-        order.append(n)
-        for m in outs.get(n, []):
-            indegree[m] -= 1
-            if indegree[m] == 0:
-                ready.append(m)
-    # attach any remaining (cycles) in insertion order
+def _layers(comp: list[str], graph: Graph) -> list[list[str]]:
+    """Longest-path layering: rank[v] = 1 + max(rank[u]) over edges u->v."""
+    rank = {n: 0 for n in comp}
+    for _ in range(len(comp)):  # longest path needs at most len-1 passes
+        changed = False
+        for e in graph.edges:
+            if e.source in rank and e.target in rank and rank[e.target] <= rank[e.source]:
+                rank[e.target] = rank[e.source] + 1
+                changed = True
+        if not changed:
+            break
+    by_rank: dict[int, list[str]] = {}
     for n in comp:
-        if n not in order:
-            order.append(n)
-    return order
+        by_rank.setdefault(rank[n], []).append(n)
+    return [by_rank[r] for r in sorted(by_rank)]
 
 
-def _edge_between(a: str, b: str, graph: Graph) -> Edge | None:
-    for e in graph.edges:
-        if {e.source, e.target} == {a, b}:
-            return e
-    return None
+def _draw_edge(
+    canvas: list[list[str]],
+    pos: dict[str, tuple[int, int, int, int]],
+    edge: Edge,
+    *,
+    vertical_only: bool = False,
+) -> None:
+    sx0, sy0, sw, sh = pos[edge.source]
+    tx0, ty0, tw, th = pos[edge.target]
+    sx = sx0 + sw
+    tx = tx0
+    sy = sy0 + sh // 2
+    ty = ty0 + th // 2
+    cx = sx + _CHANNEL // 2
+
+    def put(x: int, y: int, ch: str) -> None:
+        if 0 <= y < len(canvas) and 0 <= x < len(canvas[y]):
+            canvas[y][x] = ch
+
+    if sy == ty:
+        if vertical_only:
+            return
+        if edge.label:
+            left = "--" if not edge.directed_from_source else "<--"
+            right = "-->" if edge.directed_to_target else "--"
+            arrow = f"{left} {edge.label} {right}"
+        else:
+            arrow = "-->" if edge.directed_to_target else "--"
+            if edge.directed_from_source:
+                arrow = "<" + arrow
+        start = sx + 1
+        end = tx - 1
+        width = end - start + 1
+        if width > len(arrow):
+            cells = ["-"] * width
+            if arrow.startswith("<"):
+                cells[0] = "<"
+            if arrow.endswith(">"):
+                cells[-1] = ">"
+            for i, ch in enumerate(cells):
+                put(start + i, sy, ch)
+        else:
+            for i, ch in enumerate(arrow):
+                put(start + i, sy, ch)
+        return
+
+    # route the vertical arm from the source's bottom edge so it never
+    # collides with horizontal arrows leaving the source's mid row
+    sy = sy0 + sh - 1
+    lo, hi = (sy, ty) if sy < ty else (ty, sy)
+    if vertical_only:
+        for y in range(lo + 1, hi):
+            put(cx, y, "|")
+        return
+
+    for x in range(sx + 1, cx):
+        put(x, sy, "-")
+    for x in range(cx, tx):
+        put(x, ty, "-")
+    if edge.directed_to_target:
+        put(tx - 1, ty, ">")
+    if edge.directed_from_source:
+        put(sx + 1, sy, "<")
+    if edge.label:
+        mid_y = (lo + hi) // 2
+        for i, ch in enumerate(edge.label):
+            put(cx + i + 1, mid_y, ch)
 
 
 def render(graph: Graph) -> str:
@@ -119,19 +162,38 @@ def render(graph: Graph) -> str:
         return ""
     bands: list[str] = []
     for comp in _components(graph):
-        seq = _linearize(comp, graph)
-        boxes = [_box(graph.nodes[n]) for n in seq]
-        height = max(len(b) for b in boxes)
-        seps = [_edge_between(seq[i], seq[i + 1], graph) for i in range(len(seq) - 1)]
-        band: list[str] = []
-        for r in range(height):
-            cells: list[str] = []
-            for i, box in enumerate(boxes):
-                cells.append(box[r] if r < len(box) else " " * len(box[0]))
-                if i < len(seps):
-                    mid = (len(box) - 1) // 2
-                    sep = _edge_str(seps[i]) if r == mid and seps[i] is not None else " "
-                    cells.append(" " + sep)
-            band.append("".join(cells).rstrip())
-        bands.append("\n".join(band))
+        layers = _layers(comp, graph)
+        layer_boxes = [[_box(graph.nodes[n]) for n in layer] for layer in layers]
+        col_w = [max(len(b[0]) for b in boxes) for boxes in layer_boxes]
+        col_h = [sum(len(b) for b in boxes) + (len(boxes) - 1) for boxes in layer_boxes]
+        y_offs: list[list[int]] = []
+        for boxes in layer_boxes:
+            offs: list[int] = []
+            y = 0
+            for b in boxes:
+                offs.append(y)
+                y += len(b) + 1
+            y_offs.append(offs)
+
+        height = max(col_h) if col_h else 0
+        width = sum(col_w) + _CHANNEL * (len(layers) - 1)
+        canvas = [[" "] * width for _ in range(height)]
+        pos: dict[str, tuple[int, int, int, int]] = {}
+        x = 0
+        for c, boxes in enumerate(layer_boxes):
+            for i, b in enumerate(boxes):
+                x0 = x
+                y0 = y_offs[c][i]
+                for r, row in enumerate(b):
+                    for cc, ch in enumerate(row):
+                        canvas[y0 + r][x0 + cc] = ch
+                pos[layers[c][i]] = (x0, y0, len(b[0]), len(b))
+            x += col_w[c] + _CHANNEL
+
+        edges_in_comp = [e for e in graph.edges if e.source in pos and e.target in pos]
+        for e in edges_in_comp:
+            _draw_edge(canvas, pos, e, vertical_only=True)
+        for e in edges_in_comp:
+            _draw_edge(canvas, pos, e)
+        bands.append("\n".join("".join(row).rstrip() for row in canvas))
     return "\n\n".join(bands)
