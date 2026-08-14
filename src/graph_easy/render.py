@@ -272,8 +272,26 @@ def _draw_edge(
             put_cross(cx, y, vch)
         return
 
+    def put_corner(x: int, y: int, ch: str) -> None:
+        if 0 <= y < len(canvas) and 0 <= x < len(canvas[y]):
+            cur = canvas[y][x]
+            if cur in (" ", hch, vch):
+                canvas[y][x] = ch
+            elif cur != ch:
+                canvas[y][x] = cch
+
+    # source arm: horizontal sx..cx at row sy, then corner down at cx
     for x in range(sx + 1, cx):
         put(x, sy, hch)
+    if sy < ty:
+        put_corner(cx, sy, "┌")
+    elif sy > ty:
+        put_corner(cx, sy, "└")
+    # target arm: vertical cx..ty already drawn (vertical_only pass), corner right at cx,ty
+    if ty < sy:
+        put_corner(cx, ty, "┐")
+    elif ty > sy:
+        put_corner(cx, ty, "┘")
     for x in range(cx, tx):
         put(x, ty, hch)
     if edge.directed_to_target:

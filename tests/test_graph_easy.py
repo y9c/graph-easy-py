@@ -187,6 +187,15 @@ def test_parallel_paths_merge_cleanly():
     assert "P1" in out and "P2" in out and "T" in out
 
 
+def test_edge_corners_use_box_chars():
+    # a downward branch must draw a ┌ corner where the arm turns vertical
+    out = render(parse_graph("[ A ] --> [ B ]\n[ A ] --> [ C ]"))
+    assert "┌" in out
+    # an upward merge must draw a └/┐ corner
+    out2 = render(parse_graph("[ A ] --> [ D ]\n[ B ] --> [ D ]"))
+    assert "└" in out2 or "┐" in out2
+
+
 def test_filled_arrowhead():
     g = parse_graph("[ A ] -- { arrowshape: filled; } --> [ B ]")
     assert g.edges[0].attrs.get("arrowshape") == "filled"
