@@ -29,22 +29,35 @@ See the header of the original `Graph::Easy::Attributes` for the full notice.
 
 ## Status
 
-This is an **actively-developed port, currently covering the core rendering
-path**: node/edge boxes + labels laid out in rows and rendered to ASCII text
-(the equivalent of `Graph::Easy::Node` / `Graph::Easy::Edge` /
-`Graph::Easy::As_ascii`). The heavier automatic layout engine
-(`Graph::Easy::Layout`) is a follow-up milestone.
+Actively-developed port. Currently implemented:
 
-Progress is tracked incrementally with a test corpus derived from the upstream
-test suite.
+- **DSL parser**: `[ label ]`/bare nodes, `-->` `<--` `<-->` `--` arrows,
+  labelled edges (`-- label -->`), multiline labels (`\n`), comments
+- **Layout engine**: longest-path layering with orthogonal edge routing —
+  chains, branches, merges and cycles all render correctly; independent
+  components stack as separate diagrams
+- **Edge line styles** (faithful to upstream `Parser::_edge_style`):
+  `--` solid, `..` dotted, `==` double, `~~` wave, `##` bold, `.-`/`..-` dot-dash
+- **Two output charsets**: Unicode box-drawing by default
+  (`┌──┐ ──> ══ ║ ·`), plain ASCII via `--ascii`
+
+The heavier automatic layout engine (`Graph::Easy::Layout` grid solver) is a
+follow-up milestone.
 
 ## Usage
 
 ```console
-$ printf 'A -> B -> C\n' | graph-easy
-```
+$ printf '[ Bonn ] --> [ Berlin ] --> [ Hamburg ]\n' | graph-easy
+┌──────┐         ┌────────┐         ┌─────────┐
+│ Bonn │ ───────>│ Berlin │ ───────>│ Hamburg │
+└──────┘         └────────┘         └─────────┘
 
-renders a small labelled box diagram in your terminal.
+# plain-ASCII output
+$ printf '[ A ] ..> [ B ]\n' | graph-easy --ascii
++---+         +---+
+| A | .......>| B |
++---+         +---+
+```
 
 ## Development
 

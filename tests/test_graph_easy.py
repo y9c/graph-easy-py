@@ -70,7 +70,7 @@ def test_comments_ignored():
 # ---- rendering --------------------------------------------------------------
 
 def test_render_smoke_no_crash():
-    out = render(parse_graph("[ hello ] --> [ world ]"))
+    out = render(parse_graph("[ hello ] --> [ world ]"), ascii_style=True)
     assert "+" in out
     assert "hello" in out
     assert "world" in out
@@ -78,17 +78,23 @@ def test_render_smoke_no_crash():
 
 
 def test_render_two_components_stack_on_separate_bands():
-    out = render(parse_graph("[ A ] --> [ B ]\n[ C ] --> [ D ]"))
+    out = render(parse_graph("[ A ] --> [ B ]\n[ C ] --> [ D ]"), ascii_style=True)
     # two horizontally separate chains stacked; both labels present
     assert "A" in out and "B" in out and "C" in out and "D" in out
     assert out.count("-->") >= 2
+
+
+def test_render_unicode_default():
+    out = render(parse_graph("[ A ] --> [ B ]"))
+    assert "┌" in out and "┐" in out and "│" in out
+    assert "─" in out
 
 
 def test_undirected_edge_renders_as_double_dash():
     g = parse_graph("[ A ] -- [ B ]")
     assert not g.edges[0].directed_to_target
     assert not g.edges[0].directed_from_source
-    out = render(g)
+    out = render(g, ascii_style=True)
     assert "--" in out
     assert "-->" not in out
 
@@ -97,7 +103,7 @@ def test_labelled_edge_parses_as_label_not_node():
     g = parse_graph("[ A ] -- hello --> [ B ]")
     assert list(g.nodes) == ["A", "B"]
     assert g.edges[0].label == "hello"
-    out = render(g)
+    out = render(g, ascii_style=True)
     assert "hello" in out
 
 

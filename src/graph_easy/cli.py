@@ -19,6 +19,11 @@ def main(argv: list[str] | None = None) -> int:
         nargs="?",
         help="read DSL from FILE instead of stdin ('-' = stdin)",
     )
+    ap.add_argument(
+        "--ascii",
+        action="store_true",
+        help="use plain ASCII box/line characters (default: Unicode)",
+    )
     args = ap.parse_args(argv)
 
     if args.file and args.file != "-":
@@ -28,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
         text = sys.stdin.read()
 
     graph = parse_graph(text)
-    output = render(graph)
+    output = render(graph, ascii_style=args.ascii)
     sys.stdout.write(output + "\n")
     return 0
 

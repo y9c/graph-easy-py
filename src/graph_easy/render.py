@@ -21,10 +21,25 @@ from graph_easy.parser import Edge, Graph
 
 _CHANNEL = 9
 
-_STYLE_CHARS: dict[str, tuple[str, str, str]] = {
+_BoxChars = tuple[str, str, str, str, str, str]  # tl, tr, bl, br, v, h
+
+_BOX_UNICODE: _BoxChars = ("┌", "┐", "└", "┘", "│", "─")
+_BOX_ASCII: _BoxChars = ("+", "+", "+", "+", "|", "-")
+
+_STYLE_UNICODE: dict[str, tuple[str, str, str]] = {
+    "solid": ("─", "│", "┼"),
+    "double": ("═", "║", "╬"),
+    "dotted": ("·", ":", "┼"),
+    "dashed": ("╴", "╵", "┼"),
+    "wave": ("∼", "≀", "┼"),
+    "bold": ("━", "┃", "╋"),
+    "dot-dash": ("·", "!", "┼"),
+    "dot-dot-dash": ("·", "!", "┼"),
+}
+_STYLE_ASCII: dict[str, tuple[str, str, str]] = {
     "solid": ("-", "|", "+"),
-    "dotted": (".", ":", "+"),
     "double": ("=", '"', "#"),
+    "dotted": (".", ":", "+"),
     "dashed": ("-", "'", "+"),
     "wave": ("~", "~", "~"),
     "bold": ("#", "#", "#"),
@@ -34,25 +49,26 @@ _STYLE_CHARS: dict[str, tuple[str, str, str]] = {
 _STYLE_DEFAULT = "solid"
 
 
-def _box(node: Node) -> list[str]:
+def _box(node: Node, box: _BoxChars) -> list[str]:
     """Render one node as a list of text rows (top border .. bottom border)."""
+    tl, tr, bl, br, v, h = box
     pad_x = node.padding_x
     pad_y = node.padding_y
     inner_w = node.inner_width()
     lines = node.label_lines()
     w = node.width()
-    h = node.height()
-    border = "+" + "-" * (w - 2) + "+"
+    hgt = node.height()
+    border = tl + h * (w - 2) + tr
     rows: list[str] = [border]
     for _ in range(pad_y):
-        rows.append("|" + " " * (w - 2) + "|")
+        rows.append(v + " " * (w - 2) + v)
     for line in lines:
         right = max(inner_w - len(line), 0)
-        rows.append("|" + " " * pad_x + line + " " * (pad_x + right) + "|")
+        rows.append(v + " " * pad_x + line + " " * (pad_x + right) + v)
     for _ in range(pad_y):
-        rows.append("|" + " " * (w - 2) + "|")
-    rows.append(border)
-    assert len(rows) == h
+        rows.append(v + " " * (w - 2) + v)
+    rows.append(bl + h * (w - 2) + br)
+    assert len(rows) == hgt
     return rows
 
 
@@ -104,6 +120,7 @@ def _draw_edge(
     canvas: list[list[str]],
     pos: dict[str, tuple[int, int, int, int]],
     edge: Edge,
+    styles: dict[str, tuple[str, str, str]],
     *,
     vertical_only: bool = False,
 ) -> None:
@@ -115,7 +132,7 @@ def _draw_edge(
     ty = ty0 + th // 2
     cx = sx + _CHANNEL // 2
 
-    hch, vch, cch = _STYLE_CHARS.get(edge.style or _STYLE_DEFAULT)
+    hch, vch, cch = styles.get(edge.style or _STYLE_DEFAULT)
 
     def put(x: int, y: int, ch: str) -> None:
         if 0 <= y < len(canvas) and 0 <= x < len(canvas[y]):
@@ -161,7 +178,7 @@ def _draw_edge(
     lo, hi = (sy, ty) if sy < ty else (ty, sy)
     if vertical_only:
         for y in range(lo + 1, hi):
-            put_cross(cx, y, "|")
+            put_cross(cx, y, vch)
         return
 
     for x in range(sx + 1, cx):
@@ -178,14 +195,16 @@ def _draw_edge(
             put(cx + i + 1, mid_y, ch)
 
 
-def render(graph: Graph) -> str:
-    """Render the graph to multi-line ASCII text (no trailing newline)."""
+def render(graph: Graph, *, ascii_style: bool = False) -> str:
+    """Render the graph to multi-line ASCII/Unicode text (no trailing newline)."""
     if not graph.nodes:
         return ""
+    box_chars = _BOX_ASCII if ascii_style else _BOX_UNICODE
+    styles = _STYLE_ASCII if ascii_style else _STYLE_UNICODE
     bands: list[str] = []
     for comp in _components(graph):
         layers = _layers(comp, graph)
-        layer_boxes = [[_box(graph.nodes[n]) for n in layer] for layer in layers]
+        layer_boxes = [[_box(graph.nodes[n], box_chars) for n in layer] for layer in layers]
         col_w = [max(len(b[0]) for b in boxes) for boxes in layer_boxes]
         col_h = [sum(len(b) for b in boxes) + (len(boxes) - 1) for boxes in layer_boxes]
         y_offs: list[list[int]] = []
@@ -214,8 +233,8 @@ def render(graph: Graph) -> str:
 
         edges_in_comp = [e for e in graph.edges if e.source in pos and e.target in pos]
         for e in edges_in_comp:
-            _draw_edge(canvas, pos, e, vertical_only=True)
+            _draw_edge(canvas, pos, e, styles, vertical_only=True)
         for e in edges_in_comp:
-            _draw_edge(canvas, pos, e)
+            _draw_edge(canvas, pos, e, styles)
         bands.append("\n".join("".join(row).rstrip() for row in canvas))
     return "\n\n".join(bands)
