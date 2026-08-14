@@ -19,7 +19,7 @@ from collections import deque
 from graph_easy.node import Node
 from graph_easy.parser import Edge, Graph
 
-_CHANNEL = 9
+_CHANNEL = 5
 
 _BoxChars = tuple[str, str, str, str, str, str]  # tl, tr, bl, br, v, h
 
