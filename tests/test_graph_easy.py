@@ -84,5 +84,22 @@ def test_render_two_components_stack_on_separate_bands():
     assert out.count("-->") >= 2
 
 
+def test_undirected_edge_renders_as_double_dash():
+    g = parse_graph("[ A ] -- [ B ]")
+    assert not g.edges[0].directed_to_target
+    assert not g.edges[0].directed_from_source
+    out = render(g)
+    assert "--" in out
+    assert "-->" not in out
+
+
+def test_labelled_edge_parses_as_label_not_node():
+    g = parse_graph("[ A ] -- hello --> [ B ]")
+    assert list(g.nodes) == ["A", "B"]
+    assert g.edges[0].label == "hello"
+    out = render(g)
+    assert "hello" in out
+
+
 def test_render_empty_graph():
     assert render(parse_graph("")) == ""

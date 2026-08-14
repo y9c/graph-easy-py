@@ -63,8 +63,18 @@ class Graph:
         return self.nodes[label]
 
 
+_LABELLED_EDGE = re.compile(
+    r"\s*(?P<style1>[-=.]+)\s+(?P<label>[^<>\s][^<>\n]*?)\s+"
+    r"(?P<style2>[-=.]+)(?P<after>>)?"
+)
+
+
 def _tokens(line: str) -> list[tuple[str, str]]:
-    """Tokenise one line into (kind, value) pairs: ('node'|'edge', text)."""
+    """Tokenise one line into (kind, value) pairs: ('node'|'edge', text).
+
+    An edge written ``-- label -->`` yields an ``edge`` token immediately
+    followed by a ``label`` token; ``_stitch`` attaches the label to the edge.
+    """
     out: list[tuple[str, str]] = []
     pos = 0
     while pos < len(line):
@@ -73,10 +83,17 @@ def _tokens(line: str) -> list[tuple[str, str]]:
             pos += 1
             continue
         pos = m.end()
-        if m.group(1) is not None:
+        if m.group(2) is not None or m.group(3) is not None:
+            op = m.group(2) or m.group(3)
+            le = _LABELLED_EDGE.match(line, m.start())
+            if le:
+                out.append(("edge", op))
+                out.append(("label", le.group("label")))
+                pos = le.end()
+            else:
+                out.append(("edge", op))
+        elif m.group(1) is not None:
             out.append(("node", m.group(1)[1:-1].strip()))
-        elif m.group(2) is not None or m.group(3) is not None:
-            out.append(("edge", m.group(2) or m.group(3)))
         else:
             out.append(("node", m.group(4)))
     return out
@@ -85,19 +102,30 @@ def _tokens(line: str) -> list[tuple[str, str]]:
 def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
     """Turn a token stream (node edge node edge ...) into edges on ``g``."""
     prev: str | None = None
-    pending: str | None = None  # edge operator awaiting its target
-    for kind, value in tokens:
-        if kind == "node":
-            g.add_node(value)
-            if pending is not None and prev is not None:
-                e = Edge(source=prev, target=value)
-                e.directed_to_target = pending.endswith(">")
-                e.directed_from_source = pending.startswith("<")
-                g.edges.append(e)
-            pending = None
-            prev = value
-        else:
-            pending = value
+    pending_op: str | None = None
+    pending_label: str | None = None
+    i = 0
+    while i < len(tokens):
+        kind, value = tokens[i]
+        if kind == "label":
+            pending_label = value
+            i += 1
+            continue
+        if kind == "edge":
+            pending_op = value
+            i += 1
+            continue
+        g.add_node(value)
+        if pending_op is not None and prev is not None:
+            e = Edge(source=prev, target=value)
+            e.directed_to_target = pending_op.endswith(">")
+            e.directed_from_source = pending_op.startswith("<")
+            e.label = pending_label
+            g.edges.append(e)
+        pending_op = None
+        pending_label = None
+        prev = value
+        i += 1
 
 
 def parse_graph(text: str, *, link_as_default_label: bool = False) -> Graph:

@@ -44,7 +44,9 @@ def _edge_str(edge: Edge) -> str:
         return "<-->"
     if edge.directed_from_source:
         return "<--"
-    return "-->"
+    if edge.directed_to_target:
+        return "-->"
+    return "--"
 
 
 def _components(graph: Graph) -> list[list[str]]:
