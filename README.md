@@ -51,7 +51,12 @@ $ printf '[ Bonn ] --> [ Berlin ] --> [ Hamburg ]\n' | graph-easy
 ┌──────┐         ┌────────┐         ┌─────────┐
 │ Bonn │ ───────>│ Berlin │ ───────>│ Hamburg │
 └──────┘         └────────┘         └─────────┘
+```
 
+Colours from `fill`/`color` attributes are **on by default**; use
+`--no-color` to disable, or `--color auto` to enable only on a TTY.
+
+```console
 # plain-ASCII output
 $ printf '[ A ] ..> [ B ]\n' | graph-easy --ascii
 +---+         +---+

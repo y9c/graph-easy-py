@@ -26,16 +26,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--color",
-        action="store_true",
-        help="apply ANSI colours from fill/color attributes",
+        nargs="?",
+        const="on",
+        choices=["on", "off", "auto"],
+        help="apply ANSI colours (default: on; 'auto' = only when output is a TTY)",
     )
     ap.add_argument(
         "--no-color",
         dest="color",
-        action="store_false",
-        help="disable ANSI colours (default when output is piped)",
+        action="store_const",
+        const="off",
+        help="disable ANSI colours",
     )
-    ap.set_defaults(color=None)
+    ap.set_defaults(color="on")
     args = ap.parse_args(argv)
 
     if args.file and args.file != "-":
@@ -44,8 +47,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         text = sys.stdin.read()
 
-    if args.color is None:
+    if args.color == "auto":
         args.color = sys.stdout.isatty()
+    elif args.color == "on":
+        args.color = True
+    else:
+        args.color = False
     graph = parse_graph(text)
     output = render(graph, ascii_style=args.ascii, color=args.color)
     sys.stdout.write(output + "\n")
