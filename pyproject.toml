@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graph-easy-py"
+version = "0.0.1"
+description = "A Python port of Graph::Easy - lay out and render graphs as ASCII art"
+readme = "README.md"
+license = { text = "GPL-2.0-or-later" }
+authors = [{ name = "Tels (original Graph::Easy author)" }]
+keywords = ["graph", "ascii", "diagram", "layout", "graphviz"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Utilities",
+]
+requires-python = ">=3.10"
+
+[project.urls]
+Original = "https://github.com/ironcamel/Graph-Easy"
+
+[project.scripts]
+graph-easy = "graph_easy.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
