@@ -1,4 +1,4 @@
-# graph-easy-py
+# graph-easy
 
 A **Python port** of [Graph::Easy](https://github.com/ironcamel/Graph-Easy),
 the Perl tool that lays out directed/undirected graphs and renders them as

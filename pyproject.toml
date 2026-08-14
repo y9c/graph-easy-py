@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "graph-easy-py"
+name = "graph-easy"
 version = "0.0.1"
 description = "A Python port of Graph::Easy - lay out and render graphs as ASCII art"
 readme = "README.md"

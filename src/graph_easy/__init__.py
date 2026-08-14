@@ -1,4 +1,4 @@
-"""graph-easy-py — a Python port of Graph::Easy (GPL-2.0-or-later).
+"""graph-easy — a Python port of Graph::Easy (GPL-2.0-or-later).
 
 Port of Graph::Easy (c) Tels, 2004-2008, <http://bloodgate.com/>.
 """
