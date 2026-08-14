@@ -48,8 +48,45 @@ _STYLE_ASCII: dict[str, tuple[str, str, str]] = {
 }
 _STYLE_DEFAULT = "solid"
 
+# ANSI colour table — the 16 standard terminal colours plus common names.
+_ANSI_FG: dict[str, str] = {
+    "black": "30", "red": "31", "green": "32", "yellow": "33",
+    "blue": "34", "magenta": "35", "cyan": "36", "white": "37",
+    "brightred": "91", "brightgreen": "92", "brightyellow": "93",
+    "brightblue": "94", "brightmagenta": "95", "brightcyan": "96",
+    "grey": "90", "gray": "90", "brightwhite": "97",
+}
+_ANSI_BG: dict[str, str] = {
+    "black": "40", "red": "41", "green": "42", "yellow": "43",
+    "blue": "44", "magenta": "45", "cyan": "46", "white": "47",
+    "brightred": "101", "brightgreen": "102", "brightyellow": "103",
+    "brightblue": "104", "brightmagenta": "105", "brightcyan": "106",
+    "grey": "100", "gray": "100", "brightwhite": "107",
+}
 
-def _box(node: Node, box: _BoxChars) -> list[str]:
+
+def _ansi_fg(name: str) -> str:
+    return _ANSI_FG.get(name.strip().lower(), "")
+
+
+def _ansi_bg(name: str) -> str:
+    return _ANSI_BG.get(name.strip().lower(), "")
+
+
+def _colorize(node: Node, rows: list[str]) -> list[str]:
+    """Wrap a node's rows in ANSI colour codes from fill/color attrs."""
+    fg = _ansi_fg(node.attrs.get("color", ""))
+    bg = _ansi_bg(node.attrs.get("fill", ""))
+    codes = [c for c in (bg, fg) if c]
+    if not codes:
+        return rows
+    start = "\x1b[" + ";".join(codes) + "m"
+    end = "\x1b[0m"
+    inner = rows[1:-1]
+    return [rows[0], *[start + r + end for r in inner], rows[-1]]
+
+
+def _box(node: Node, box: _BoxChars, color: bool = False) -> list[str]:
     """Render one node as a list of text rows (top border .. bottom border).
 
     Shape/attribute aware: ``shape: diamond`` draws a rhombus, ``border:
@@ -59,7 +96,8 @@ def _box(node: Node, box: _BoxChars) -> list[str]:
     shape = node.attrs.get("shape", "normal")
     border = node.attrs.get("border", "solid")
     if shape == "diamond":
-        return _box_diamond(node, border, box)
+        rows = _box_diamond(node, border, box, color)
+        return _colorize(node, rows) if color else rows
     pad_x = node.padding_x
     pad_y = node.padding_y
     inner_w = node.inner_width()
@@ -84,11 +122,12 @@ def _box(node: Node, box: _BoxChars) -> list[str]:
     for _ in range(pad_y):
         rows.append(v2 + " " * (w - 2) + v2)
     rows.append(bl + h2 * (w - 2) + br)
-    assert len(rows) == hgt
+    if color:
+        rows = _colorize(node, rows)
     return rows
 
 
-def _box_diamond(node: Node, border: str, box: _BoxChars) -> list[str]:
+def _box_diamond(node: Node, border: str, box: _BoxChars, color: bool = False) -> list[str]:
     """Diamond (rhombus) node — label centered on the widest diagonal row."""
     _, _, _, _, v, h = box
     hch = "═" if border == "double" else h
@@ -177,6 +216,14 @@ def _draw_edge(
 
     hch, vch, cch = styles.get(edge.style or _STYLE_DEFAULT)
 
+    arrowshape = edge.attrs.get("arrowshape", "")
+    if styles is _STYLE_ASCII:
+        ar, al = ">", "<"
+    elif arrowshape == "filled":
+        ar, al = "▶", "◀"
+    else:
+        ar, al = ">", "<"
+
     def put(x: int, y: int, ch: str) -> None:
         if 0 <= y < len(canvas) and 0 <= x < len(canvas[y]):
             canvas[y][x] = ch
@@ -192,22 +239,22 @@ def _draw_edge(
         if vertical_only:
             return
         if edge.label:
-            left = f"{hch}{hch}" if not edge.directed_from_source else f"<{hch}{hch}"
-            right = f"{hch}{hch}>" if edge.directed_to_target else f"{hch}{hch}"
+            left = f"{hch}{hch}" if not edge.directed_from_source else f"{al}{hch}{hch}"
+            right = f"{hch}{hch}{ar}" if edge.directed_to_target else f"{hch}{hch}"
             arrow = f"{left} {edge.label} {right}"
         else:
-            arrow = f"{hch}{hch}>" if edge.directed_to_target else f"{hch}{hch}"
+            arrow = f"{hch}{hch}{ar}" if edge.directed_to_target else f"{hch}{hch}"
             if edge.directed_from_source:
-                arrow = "<" + arrow
+                arrow = al + arrow
         start = sx + 1
         end = tx - 1
         width = end - start + 1
         if width > len(arrow):
             cells = [hch] * width
-            if arrow.startswith("<"):
-                cells[0] = "<"
-            if arrow.endswith(">"):
-                cells[-1] = ">"
+            if arrow.startswith(al):
+                cells[0] = al
+            if arrow.endswith(ar):
+                cells[-1] = ar
             for i, ch in enumerate(cells):
                 put(start + i, sy, ch)
         else:
@@ -229,16 +276,16 @@ def _draw_edge(
     for x in range(cx, tx):
         put(x, ty, hch)
     if edge.directed_to_target:
-        put(tx - 1, ty, ">")
+        put(tx - 1, ty, ar)
     if edge.directed_from_source:
-        put(sx + 1, sy, "<")
+        put(sx + 1, sy, al)
     if edge.label:
         mid_y = (lo + hi) // 2
         for i, ch in enumerate(edge.label):
             put(cx + i + 1, mid_y, ch)
 
 
-def render(graph: Graph, *, ascii_style: bool = False) -> str:
+def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> str:
     """Render the graph to multi-line ASCII/Unicode text (no trailing newline)."""
     if not graph.nodes:
         return ""
@@ -247,7 +294,7 @@ def render(graph: Graph, *, ascii_style: bool = False) -> str:
     bands: list[str] = []
     for comp in _components(graph):
         layers = _layers(comp, graph)
-        layer_boxes = [[_box(graph.nodes[n], box_chars) for n in layer] for layer in layers]
+        layer_boxes = [[_box(graph.nodes[n], box_chars, color) for n in layer] for layer in layers]
         col_w = [max(max(len(row) for row in b) for b in boxes) for boxes in layer_boxes]
         col_h = [sum(len(b) for b in boxes) + (len(boxes) - 1) for boxes in layer_boxes]
         y_offs: list[list[int]] = []

@@ -79,7 +79,7 @@ class Graph:
 
 
 _LABELLED_EDGE = re.compile(
-    r"\s*(?P<style1>[-=.]+)\s+(?P<label>[^<>\s][^<>\n]*?)\s+"
+    r"\s*(?P<style1>[-=.]+)\s+(?P<label>[^{<>\s][^<>\n]*?)\s+"
     r"(?P<style2>[-=.]+)(?P<after>>)?"
 )
 
@@ -134,10 +134,15 @@ def _edge_style(op: str) -> str | None:
 
 
 def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
-    """Turn a token stream (node edge node edge ...) into edges on ``g``."""
+    """Turn a token stream (node edge node edge ...) into edges on ``g``.
+
+    Attribute blocks ``{ k: v; }`` attach to the most recent object: the
+    pending edge when one is open (``-- { a } -->``), else the last node.
+    """
     prev: str | None = None
     pending_op: str | None = None
     pending_label: str | None = None
+    pending_attrs: dict[str, str] = {}
     i = 0
     while i < len(tokens):
         kind, value = tokens[i]
@@ -150,8 +155,11 @@ def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
             i += 1
             continue
         if kind == "attr":
-            if prev is not None:
-                g.nodes[prev].attrs.update(_parse_attrs(value))
+            if pending_op is None:
+                if prev is not None:
+                    g.nodes[prev].attrs.update(_parse_attrs(value))
+            else:
+                pending_attrs.update(_parse_attrs(value))
             i += 1
             continue
         g.add_node(value)
@@ -161,9 +169,13 @@ def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
             e.directed_from_source = pending_op.startswith("<")
             e.label = pending_label
             e.style = _edge_style(pending_op.strip("<>"))
+            e.attrs = dict(pending_attrs)
             g.edges.append(e)
+        elif pending_attrs:
+            g.nodes[value].attrs.update(pending_attrs)
         pending_op = None
         pending_label = None
+        pending_attrs = {}
         prev = value
         i += 1
 

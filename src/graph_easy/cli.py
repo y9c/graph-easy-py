@@ -24,6 +24,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="use plain ASCII box/line characters (default: Unicode)",
     )
+    ap.add_argument(
+        "--color",
+        action="store_true",
+        help="apply ANSI colours from fill/color attributes",
+    )
+    ap.add_argument(
+        "--no-color",
+        dest="color",
+        action="store_false",
+        help="disable ANSI colours (default when output is piped)",
+    )
+    ap.set_defaults(color=None)
     args = ap.parse_args(argv)
 
     if args.file and args.file != "-":
@@ -32,8 +44,10 @@ def main(argv: list[str] | None = None) -> int:
     else:
         text = sys.stdin.read()
 
+    if args.color is None:
+        args.color = sys.stdout.isatty()
     graph = parse_graph(text)
-    output = render(graph, ascii_style=args.ascii)
+    output = render(graph, ascii_style=args.ascii, color=args.color)
     sys.stdout.write(output + "\n")
     return 0
 
