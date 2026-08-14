@@ -49,7 +49,7 @@ follow-up milestone.
 ```console
 $ printf '[ Bonn ] --> [ Berlin ] --> [ Hamburg ]\n' | graph-easy
 ┌──────┐         ┌────────┐         ┌─────────┐
-│ Bonn │ ───────>│ Berlin │ ───────>│ Hamburg │
+│ Bonn │ ───────▶│ Berlin │ ───────▶│ Hamburg │
 └──────┘         └────────┘         └─────────┘
 ```
 

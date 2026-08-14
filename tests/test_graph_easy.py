@@ -188,12 +188,17 @@ def test_parallel_paths_merge_cleanly():
 
 
 def test_edge_corners_use_box_chars():
-    # a downward branch must draw a ┌ corner where the arm turns vertical
+    # a downward branch: the source arm turns down (┐) and the vertical
+    # arm turns right into the target (└)
     out = render(parse_graph("[ A ] --> [ B ]\n[ A ] --> [ C ]"))
-    assert "┌" in out
-    # an upward merge must draw a └/┐ corner
+    assert "┐" in out and "└" in out
+    # an upward merge: the vertical arm joins the target's through-line
+    # as a tee (┬) so no edge looks broken
     out2 = render(parse_graph("[ A ] --> [ D ]\n[ B ] --> [ D ]"))
-    assert "└" in out2 or "┐" in out2
+    assert "┘" in out2 and "┬" in out2
+    # ASCII corners fall back to "+"
+    out3 = render(parse_graph("[ A ] --> [ B ]\n[ A ] --> [ C ]"), ascii_style=True)
+    assert "\u250c" not in out3 and "+" in out3
 
 
 def test_filled_arrowhead():
@@ -201,6 +206,14 @@ def test_filled_arrowhead():
     assert g.edges[0].attrs.get("arrowshape") == "filled"
     out = render(g)
     assert "▶" in out
+
+
+def test_default_arrowhead_is_filled_triangle():
+    # unicode output uses ▶/◀ by default; arrowshape: plain opts out
+    out = render(parse_graph("[ A ] --> [ B ]"))
+    assert "▶" in out and ">" not in out
+    out2 = render(parse_graph("[ A ] -- { arrowshape: plain; } --> [ B ]"))
+    assert ">" in out2 and "▶" not in out2
 
 
 def test_color_attrs_when_enabled():

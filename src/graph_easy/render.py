@@ -218,12 +218,10 @@ def _draw_edge(
     hch, vch, cch = styles.get(edge.style or _STYLE_DEFAULT)
 
     arrowshape = edge.attrs.get("arrowshape", "")
-    if styles is _STYLE_ASCII:
+    if styles is _STYLE_ASCII or arrowshape == "plain":
         ar, al = ">", "<"
-    elif arrowshape == "filled":
-        ar, al = "▶", "◀"
     else:
-        ar, al = ">", "<"
+        ar, al = "▶", "◀"
 
     def put(x: int, y: int, ch: str) -> None:
         if 0 <= y < len(canvas) and 0 <= x < len(canvas[y]):
@@ -275,19 +273,32 @@ def _draw_edge(
     def put_corner(x: int, y: int, ch: str) -> None:
         if 0 <= y < len(canvas) and 0 <= x < len(canvas[y]):
             cur = canvas[y][x]
-            if cur in (" ", hch, vch, "·", ":"):
+            if cur in (" ", "·", ":"):
                 canvas[y][x] = ch
+            elif cur == hch:
+                canvas[y][x] = "+" if styles is _STYLE_ASCII else ("┬" if ch in ("┐", "┌") else "┴")
+            elif cur == vch:
+                canvas[y][x] = "+" if styles is _STYLE_ASCII else ("┤" if ch in ("┐", "┘") else "├")
             elif cur != ch:
                 canvas[y][x] = cch
 
-    # source arm: horizontal sx..cx-1 at row sy, corner at cx
+    # glyph per turn: source arm (from left) turns ┐ down / ┘ up;
+    # target turns └ when the vertical comes from above, ┌ from below
+    if styles is _STYLE_ASCII:
+        corner_down, corner_up = "+", "+"
+        corner_from_above, corner_from_below = "+", "+"
+    else:
+        corner_down, corner_up = "┐", "┘"
+        corner_from_above, corner_from_below = "└", "┌"
+
     for x in range(sx + 1, cx):
         put(x, sy, hch)
     if sy < ty:
-        put_corner(cx, sy, "┌")
+        put_corner(cx, sy, corner_down)
+        put_corner(cx, ty, corner_from_above)
     elif sy > ty:
-        put_corner(cx, sy, "└")
-    # target arm: horizontal cx+1..tx-1 at row ty
+        put_corner(cx, sy, corner_up)
+        put_corner(cx, ty, corner_from_below)
     for x in range(cx + 1, tx):
         put(x, ty, hch)
     if edge.directed_to_target:
