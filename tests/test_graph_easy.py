@@ -109,3 +109,23 @@ def test_labelled_edge_parses_as_label_not_node():
 
 def test_render_empty_graph():
     assert render(parse_graph("")) == ""
+
+
+# ---- shapes & attributes ----------------------------------------------------
+
+def test_node_attribute_block_applies_shape():
+    g = parse_graph("[ Start ] { shape: diamond; } --> [ A ]")
+    assert g.nodes["Start"].attrs.get("shape") == "diamond"
+    out = render(g)
+    assert "/" in out and "\\" in out
+
+
+def test_unknown_attribute_falls_back_to_normal_box():
+    out = render(parse_graph("[ A ] { foo: bar; } --> [ B ]"), ascii_style=True)
+    assert "+" in out and "A" in out
+
+
+def test_double_and_rounded_borders():
+    out = render(parse_graph("[ A ] { border: double; } --> [ B ] { shape: rounded; }"))
+    assert "═" in out  # double border
+    assert "╭" in out  # rounded corner

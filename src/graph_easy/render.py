@@ -50,25 +50,68 @@ _STYLE_DEFAULT = "solid"
 
 
 def _box(node: Node, box: _BoxChars) -> list[str]:
-    """Render one node as a list of text rows (top border .. bottom border)."""
+    """Render one node as a list of text rows (top border .. bottom border).
+
+    Shape/attribute aware: ``shape: diamond`` draws a rhombus, ``border:
+    double/dashed`` changes the frame characters.
+    """
     tl, tr, bl, br, v, h = box
+    shape = node.attrs.get("shape", "normal")
+    border = node.attrs.get("border", "solid")
+    if shape == "diamond":
+        return _box_diamond(node, border, box)
     pad_x = node.padding_x
     pad_y = node.padding_y
     inner_w = node.inner_width()
     lines = node.label_lines()
     w = node.width()
     hgt = node.height()
-    border = tl + h * (w - 2) + tr
-    rows: list[str] = [border]
+    if border == "double":
+        h2, v2 = "═", "║"
+    elif border == "dashed":
+        h2, v2 = "╌", "╎"
+    else:
+        h2, v2 = h, v
+    if shape in ("ellipse", "rounded"):
+        tl, tr, bl, br = "╭", "╮", "╰", "╯"
+    border_t = tl + h2 * (w - 2) + tr
+    rows: list[str] = [border_t]
     for _ in range(pad_y):
-        rows.append(v + " " * (w - 2) + v)
+        rows.append(v2 + " " * (w - 2) + v2)
     for line in lines:
         right = max(inner_w - len(line), 0)
-        rows.append(v + " " * pad_x + line + " " * (pad_x + right) + v)
+        rows.append(v2 + " " * pad_x + line + " " * (pad_x + right) + v2)
     for _ in range(pad_y):
-        rows.append(v + " " * (w - 2) + v)
-    rows.append(bl + h * (w - 2) + br)
+        rows.append(v2 + " " * (w - 2) + v2)
+    rows.append(bl + h2 * (w - 2) + br)
     assert len(rows) == hgt
+    return rows
+
+
+def _box_diamond(node: Node, border: str, box: _BoxChars) -> list[str]:
+    """Diamond (rhombus) node — label centered on the widest diagonal row."""
+    _, _, _, _, v, h = box
+    hch = "═" if border == "double" else h
+    vch = "║" if border == "double" else v
+    lines = node.label_lines()
+    inner_w = node.inner_width()
+    half = inner_w // 2
+    width = inner_w + 4
+    total_rows = len(lines) + 2
+    rows: list[str] = []
+    for r in range(total_rows):
+        if r == 0:
+            row = " " * (half + 1) + "/" + hch * max(inner_w - 2, 1) + "\\"
+        elif r == total_rows - 1:
+            row = " " * (half + 1) + "\\" + hch * max(inner_w - 2, 1) + "/"
+        else:
+            li = r - 1
+            pad = abs(half - li)
+            text = lines[li] if li < len(lines) else ""
+            left_pad = " " * (pad + 1)
+            right_pad = " " * (max(inner_w - len(text), 0) + pad + 1)
+            row = left_pad + vch + text + right_pad + vch
+        rows.append(row.ljust(width))
     return rows
 
 
@@ -205,7 +248,7 @@ def render(graph: Graph, *, ascii_style: bool = False) -> str:
     for comp in _components(graph):
         layers = _layers(comp, graph)
         layer_boxes = [[_box(graph.nodes[n], box_chars) for n in layer] for layer in layers]
-        col_w = [max(len(b[0]) for b in boxes) for boxes in layer_boxes]
+        col_w = [max(max(len(row) for row in b) for b in boxes) for boxes in layer_boxes]
         col_h = [sum(len(b) for b in boxes) + (len(boxes) - 1) for boxes in layer_boxes]
         y_offs: list[list[int]] = []
         for boxes in layer_boxes:
