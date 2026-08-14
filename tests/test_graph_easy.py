@@ -161,6 +161,32 @@ def test_disjoint_groups_render_separately():
     assert out.count("┌ G2") == 1
 
 
+# ---- layout: fan-out / parallel branches ------------------------------------
+
+def test_fan_out_keeps_all_edges():
+    g = parse_graph("[ S ] --> [ A ]\n[ S ] --> [ B ]\n[ S ] --> [ C ]\n")
+    assert len(g.edges) == 3
+    out = render(g)
+    # all three targets appear
+    assert "A" in out and "B" in out and "C" in out
+
+
+def test_diamond_renders_all_four_edges():
+    g = parse_graph("[ A ] --> [ B ]\n[ A ] --> [ C ]\n[ B ] --> [ D ]\n[ C ] --> [ D ]\n")
+    assert len(g.edges) == 4
+    out = render(g)
+    assert "D" in out and "B" in out and "C" in out
+
+
+def test_parallel_paths_merge_cleanly():
+    g = parse_graph(
+        "[ S ] --> [ P1 ]\n[ S ] --> [ P2 ]\n"
+        "[ P1 ] --> [ T ]\n[ P2 ] --> [ T ]\n"
+    )
+    out = render(g)
+    assert "P1" in out and "P2" in out and "T" in out
+
+
 def test_filled_arrowhead():
     g = parse_graph("[ A ] -- { arrowshape: filled; } --> [ B ]")
     assert g.edges[0].attrs.get("arrowshape") == "filled"

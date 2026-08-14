@@ -213,7 +213,7 @@ def _draw_edge(
     tx = tx0
     sy = sy0 + sh // 2
     ty = ty0 + th // 2
-    cx = sx + _CHANNEL // 2
+    cx = (sx + tx) // 2 if tx - sx > _CHANNEL else sx + _CHANNEL // 2
 
     hch, vch, cch = styles.get(edge.style or _STYLE_DEFAULT)
 
@@ -286,6 +286,42 @@ def _draw_edge(
             put(cx + i + 1, mid_y, ch)
 
 
+def _barycenter_order(layers: list[list[str]], graph: Graph) -> list[list[str]]:
+    """Reorder nodes within each layer to reduce edge crossings.
+
+    Sugiyama barycenter heuristic: each node's x position is the average of
+    its neighbours' positions in the previous layer; layers are then sorted
+    by that average. Iterates top-down then bottom-up until stable.
+    """
+    order = [list(layer) for layer in layers]
+    n_layers = len(order)
+    for _ in range(n_layers + 1):
+        changed = False
+        for direction in (1, -1):
+            for li in range(n_layers):
+                prev_i = li - direction
+                if prev_i < 0 or prev_i >= n_layers:
+                    continue
+                prev_order = order[prev_i]
+                prev_idx = {n: i for i, n in enumerate(prev_order)}
+                score: list[tuple[float, int, str]] = []
+                for j, n in enumerate(order[li]):
+                    neigh = [e.target for e in graph.edges if e.source == n and e.target in prev_idx]
+                    neigh += [e.source for e in graph.edges if e.target == n and e.source in prev_idx]
+                    if neigh:
+                        avg = sum(prev_idx[x] for x in neigh) / len(neigh)
+                    else:
+                        avg = j
+                    score.append((avg, j, n))
+                new_order = [x[2] for x in sorted(score)]
+                if new_order != order[li]:
+                    order[li] = new_order
+                    changed = True
+        if not changed:
+            break
+    return order
+
+
 def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> str:
     """Render the graph to multi-line ASCII/Unicode text (no trailing newline)."""
     if not graph.nodes:
@@ -294,7 +330,7 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
     styles = _STYLE_ASCII if ascii_style else _STYLE_UNICODE
     bands: list[str] = []
     for comp in _components(graph):
-        layers = _layers(comp, graph)
+        layers = _barycenter_order(_layers(comp, graph), graph)
         layer_boxes = [[_box(graph.nodes[n], box_chars) for n in layer] for layer in layers]
         col_w = [max(max(len(row) for row in b) for b in boxes) for boxes in layer_boxes]
         col_h = [sum(len(b) for b in boxes) + (len(boxes) - 1) for boxes in layer_boxes]
