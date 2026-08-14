@@ -245,7 +245,7 @@ def _draw_edge(
             arrow = f"{hch}{hch}{ar}" if edge.directed_to_target else f"{hch}{hch}"
             if edge.directed_from_source:
                 arrow = al + arrow
-        start = sx + 1
+        start = sx
         end = tx - 1
         width = end - start + 1
         if width > len(arrow):
@@ -291,7 +291,7 @@ def _draw_edge(
         corner_down, corner_up = "┐", "┘"
         corner_from_above, corner_from_below = "└", "┌"
 
-    for x in range(sx + 1, cx):
+    for x in range(sx, cx):
         put(x, sy, hch)
     if sy < ty:
         put_corner(cx, sy, corner_down)
@@ -304,7 +304,7 @@ def _draw_edge(
     if edge.directed_to_target:
         put(tx - 1, ty, ar)
     if edge.directed_from_source:
-        put(sx + 1, sy, al)
+        put(sx, sy, al)
     if edge.label:
         mid_y = (lo + hi) // 2
         for i, ch in enumerate(edge.label):
