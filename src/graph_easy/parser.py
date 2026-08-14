@@ -29,8 +29,8 @@ _TOK = re.compile(
     r"\s*"
     r"(?:"
     r"(\[[^\]]*\])"          # 1: bracketed node
-    r"|(<[=.\-]*[=.\-]>?)"   # 2: edge with leading '<'  (e.g. <--, <-->)
-    r"|([=.\-]*[=.\-]>?)"    # 3: edge without '<'       (e.g. -->, --, ->)
+    r"|(<[=.\-~#]*[=.\-~#]>?)"   # 2: edge with leading '<'
+    r"|([=.\-~#]*[=.\-~#]>?)"    # 3: edge without '<'
     r"|([^\s]+)"             # 4: bare word
     r")"
 )
@@ -99,6 +99,23 @@ def _tokens(line: str) -> list[tuple[str, str]]:
     return out
 
 
+def _edge_style(op: str) -> str | None:
+    """Map a connector string to a style name (upstream Parser::_edge_style)."""
+    if re.fullmatch(r"=+", op):
+        return "double"
+    if re.fullmatch(r"\.+", op):
+        return "dotted"
+    if re.fullmatch(r"~+", op):
+        return "wave"
+    if re.fullmatch(r"#+", op):
+        return "bold"
+    if re.fullmatch(r"(\.-)+", op):
+        return "dot-dash"
+    if re.fullmatch(r"(\.\.-)+", op):
+        return "dot-dot-dash"
+    return None
+
+
 def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
     """Turn a token stream (node edge node edge ...) into edges on ``g``."""
     prev: str | None = None
@@ -121,6 +138,7 @@ def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
             e.directed_to_target = pending_op.endswith(">")
             e.directed_from_source = pending_op.startswith("<")
             e.label = pending_label
+            e.style = _edge_style(pending_op.strip("<>"))
             g.edges.append(e)
         pending_op = None
         pending_label = None

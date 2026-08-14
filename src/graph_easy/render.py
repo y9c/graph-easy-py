@@ -5,8 +5,9 @@ subset, laid out on a character canvas:
 
 * nodes are boxed and grouped into horizontal layers (longest-path layering)
 * within a layer, nodes stack vertically
-* edges connect layers with ``-->`` / ``<--`` / ``<--->`` / ``--`` arrows;
-  vertical runs use ``|``; labelled edges write the label on the connector.
+* edges connect layers with arrows; the connector style selects the line
+  characters (``--`` solid, ``..`` dotted, ``==`` double, ``~~`` wave,
+  ``##`` bold); vertical runs and arrowheads follow the same style.
 
 Independent components render as separate stacked diagrams.
 """
@@ -19,6 +20,18 @@ from graph_easy.node import Node
 from graph_easy.parser import Edge, Graph
 
 _CHANNEL = 9
+
+_STYLE_CHARS: dict[str, tuple[str, str, str]] = {
+    "solid": ("-", "|", "+"),
+    "dotted": (".", ":", "+"),
+    "double": ("=", '"', "#"),
+    "dashed": ("-", "'", "+"),
+    "wave": ("~", "~", "~"),
+    "bold": ("#", "#", "#"),
+    "dot-dash": (".", ":", "+"),
+    "dot-dot-dash": (".", ":", "+"),
+}
+_STYLE_DEFAULT = "solid"
 
 
 def _box(node: Node) -> list[str]:
@@ -102,26 +115,35 @@ def _draw_edge(
     ty = ty0 + th // 2
     cx = sx + _CHANNEL // 2
 
+    hch, vch, cch = _STYLE_CHARS.get(edge.style or _STYLE_DEFAULT)
+
     def put(x: int, y: int, ch: str) -> None:
         if 0 <= y < len(canvas) and 0 <= x < len(canvas[y]):
             canvas[y][x] = ch
+
+    def put_cross(x: int, y: int, ch: str) -> None:
+        if 0 <= y < len(canvas) and 0 <= x < len(canvas[y]):
+            if canvas[y][x] == " ":
+                canvas[y][x] = ch
+            elif canvas[y][x] != ch:
+                canvas[y][x] = cch
 
     if sy == ty:
         if vertical_only:
             return
         if edge.label:
-            left = "--" if not edge.directed_from_source else "<--"
-            right = "-->" if edge.directed_to_target else "--"
+            left = f"{hch}{hch}" if not edge.directed_from_source else f"<{hch}{hch}"
+            right = f"{hch}{hch}>" if edge.directed_to_target else f"{hch}{hch}"
             arrow = f"{left} {edge.label} {right}"
         else:
-            arrow = "-->" if edge.directed_to_target else "--"
+            arrow = f"{hch}{hch}>" if edge.directed_to_target else f"{hch}{hch}"
             if edge.directed_from_source:
                 arrow = "<" + arrow
         start = sx + 1
         end = tx - 1
         width = end - start + 1
         if width > len(arrow):
-            cells = ["-"] * width
+            cells = [hch] * width
             if arrow.startswith("<"):
                 cells[0] = "<"
             if arrow.endswith(">"):
@@ -139,13 +161,13 @@ def _draw_edge(
     lo, hi = (sy, ty) if sy < ty else (ty, sy)
     if vertical_only:
         for y in range(lo + 1, hi):
-            put(cx, y, "|")
+            put_cross(cx, y, "|")
         return
 
     for x in range(sx + 1, cx):
-        put(x, sy, "-")
+        put(x, sy, hch)
     for x in range(cx, tx):
-        put(x, ty, "-")
+        put(x, ty, hch)
     if edge.directed_to_target:
         put(tx - 1, ty, ">")
     if edge.directed_from_source:
