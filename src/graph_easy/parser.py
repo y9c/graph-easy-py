@@ -32,7 +32,8 @@ _TOK = re.compile(
     r"|(<[=.\-~#]*[=.\-~#]>?)"   # 2: edge with leading '<'
     r"|([=.\-~#]*[=.\-~#]>?)"    # 3: edge without '<'
     r"|(\{[^{}]*\})"         # 4: attribute block { k: v; }
-    r"|([^\s]+)"             # 5: bare word
+    r"|([()])"               # 5: group open/close
+    r"|([^\s]+)"             # 6: bare word
     r")"
 )
 
@@ -111,8 +112,13 @@ def _tokens(line: str) -> list[tuple[str, str]]:
             out.append(("node", m.group(1)[1:-1].strip()))
         elif m.group(4) is not None:
             out.append(("attr", m.group(4)))
+        elif m.group(5) is not None:
+            if m.group(5) == "(":
+                out.append(("group_open", ""))
+            else:
+                out.append(("group_close", ""))
         else:
-            out.append(("node", m.group(5)))
+            out.append(("node", m.group(6)))
     return out
 
 
@@ -143,9 +149,20 @@ def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
     pending_op: str | None = None
     pending_label: str | None = None
     pending_attrs: dict[str, str] = {}
+    group_name: str | None = None
+    expect_group_name = False
     i = 0
     while i < len(tokens):
         kind, value = tokens[i]
+        if kind == "group_open":
+            expect_group_name = True
+            i += 1
+            continue
+        if kind == "group_close":
+            group_name = None
+            expect_group_name = False
+            i += 1
+            continue
         if kind == "label":
             pending_label = value
             i += 1
@@ -162,7 +179,14 @@ def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
                 pending_attrs.update(_parse_attrs(value))
             i += 1
             continue
+        if expect_group_name and group_name is None:
+            group_name = value
+            expect_group_name = False
+            i += 1
+            continue
         g.add_node(value)
+        if group_name is not None:
+            g.nodes[value].attrs["group"] = group_name
         if pending_op is not None and prev is not None:
             e = Edge(source=prev, target=value)
             e.directed_to_target = pending_op.endswith(">")

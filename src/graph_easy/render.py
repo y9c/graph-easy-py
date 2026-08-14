@@ -73,20 +73,24 @@ def _ansi_bg(name: str) -> str:
     return _ANSI_BG.get(name.strip().lower(), "")
 
 
-def _colorize(node: Node, rows: list[str]) -> list[str]:
-    """Wrap a node's rows in ANSI colour codes from fill/color attrs."""
-    fg = _ansi_fg(node.attrs.get("color", ""))
-    bg = _ansi_bg(node.attrs.get("fill", ""))
-    codes = [c for c in (bg, fg) if c]
-    if not codes:
-        return rows
-    start = "\x1b[" + ";".join(codes) + "m"
-    end = "\x1b[0m"
-    inner = rows[1:-1]
-    return [rows[0], *[start + r + end for r in inner], rows[-1]]
+def _apply_color(canvas: list[list[str]], pos: dict, graph: Graph) -> None:
+    """Post-process: wrap each node's interior rows in ANSI colour codes."""
+    for name, (x0, y0, w, h) in pos.items():
+        node = graph.nodes[name]
+        fg = _ansi_fg(node.attrs.get("color", ""))
+        bg = _ansi_bg(node.attrs.get("fill", ""))
+        codes = [c for c in (bg, fg) if c]
+        if not codes:
+            continue
+        start = "\x1b[" + ";".join(codes) + "m"
+        end = "\x1b[0m"
+        for r in range(1, h - 1):
+            row = canvas[y0 + r]
+            row[x0] = start + row[x0]
+            row[x0 + w - 1] += end
 
 
-def _box(node: Node, box: _BoxChars, color: bool = False) -> list[str]:
+def _box(node: Node, box: _BoxChars) -> list[str]:
     """Render one node as a list of text rows (top border .. bottom border).
 
     Shape/attribute aware: ``shape: diamond`` draws a rhombus, ``border:
@@ -96,8 +100,7 @@ def _box(node: Node, box: _BoxChars, color: bool = False) -> list[str]:
     shape = node.attrs.get("shape", "normal")
     border = node.attrs.get("border", "solid")
     if shape == "diamond":
-        rows = _box_diamond(node, border, box, color)
-        return _colorize(node, rows) if color else rows
+        return _box_diamond(node, border, box)
     pad_x = node.padding_x
     pad_y = node.padding_y
     inner_w = node.inner_width()
@@ -122,12 +125,10 @@ def _box(node: Node, box: _BoxChars, color: bool = False) -> list[str]:
     for _ in range(pad_y):
         rows.append(v2 + " " * (w - 2) + v2)
     rows.append(bl + h2 * (w - 2) + br)
-    if color:
-        rows = _colorize(node, rows)
     return rows
 
 
-def _box_diamond(node: Node, border: str, box: _BoxChars, color: bool = False) -> list[str]:
+def _box_diamond(node: Node, border: str, box: _BoxChars) -> list[str]:
     """Diamond (rhombus) node — label centered on the widest diagonal row."""
     _, _, _, _, v, h = box
     hch = "═" if border == "double" else h
@@ -294,7 +295,7 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
     bands: list[str] = []
     for comp in _components(graph):
         layers = _layers(comp, graph)
-        layer_boxes = [[_box(graph.nodes[n], box_chars, color) for n in layer] for layer in layers]
+        layer_boxes = [[_box(graph.nodes[n], box_chars) for n in layer] for layer in layers]
         col_w = [max(max(len(row) for row in b) for b in boxes) for boxes in layer_boxes]
         col_h = [sum(len(b) for b in boxes) + (len(boxes) - 1) for boxes in layer_boxes]
         y_offs: list[list[int]] = []
@@ -306,15 +307,17 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
                 y += len(b) + 1
             y_offs.append(offs)
 
-        height = max(col_h) if col_h else 0
-        width = sum(col_w) + _CHANNEL * (len(layers) - 1)
+        has_groups = any(graph.nodes[n].attrs.get("group") for n in comp)
+        pad = 1 if has_groups else 0
+        height = (max(col_h) if col_h else 0) + 2 * pad
+        width = (sum(col_w) + _CHANNEL * (len(layers) - 1)) + 2 * pad
         canvas = [[" "] * width for _ in range(height)]
         pos: dict[str, tuple[int, int, int, int]] = {}
-        x = 0
+        x = pad
         for c, boxes in enumerate(layer_boxes):
             for i, b in enumerate(boxes):
                 x0 = x
-                y0 = y_offs[c][i]
+                y0 = y_offs[c][i] + pad
                 for r, row in enumerate(b):
                     for cc, ch in enumerate(row):
                         canvas[y0 + r][x0 + cc] = ch
@@ -326,5 +329,49 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
             _draw_edge(canvas, pos, e, styles, vertical_only=True)
         for e in edges_in_comp:
             _draw_edge(canvas, pos, e, styles)
+        _draw_groups(canvas, pos, graph, box_chars)
+        if color:
+            _apply_color(canvas, pos, graph)
         bands.append("\n".join("".join(row).rstrip() for row in canvas))
     return "\n\n".join(bands)
+
+
+def _draw_groups(
+    canvas: list[list[str]],
+    pos: dict[str, tuple[int, int, int, int]],
+    graph: Graph,
+    box: _BoxChars,
+) -> None:
+    """Draw a labelled dashed frame around each group's nodes."""
+    by_group: dict[str, list[str]] = {}
+    for n in graph.nodes:
+        grp = graph.nodes[n].attrs.get("group")
+        if grp and n in pos:
+            by_group.setdefault(grp, []).append(n)
+    for grp, members in by_group.items():
+        xs = [pos[m][0] for m in members]
+        ys = [pos[m][1] for m in members]
+        xe = [pos[m][0] + pos[m][2] for m in members]
+        ye = [pos[m][1] + pos[m][3] for m in members]
+        x0, x1 = min(xs) - 1, max(xe) + 1
+        y0, y1 = min(ys) - 1, max(ye) + 1
+        x0 = max(x0, 0)
+        y0 = max(y0, 0)
+        x1 = min(x1, len(canvas[0]) - 1)
+        y1 = min(y1, len(canvas) - 1)
+        for x in range(x0, x1 + 1):
+            if canvas[y0][x] == " ":
+                canvas[y0][x] = "─"
+            if canvas[y1][x] == " ":
+                canvas[y1][x] = "─"
+        for y in range(y0, y1 + 1):
+            if canvas[y][x0] == " ":
+                canvas[y][x0] = "│"
+            if canvas[y][x1] == " ":
+                canvas[y][x1] = "│"
+        canvas[y0][x0], canvas[y0][x1] = "┌", "┐"
+        canvas[y1][x0], canvas[y1][x1] = "└", "┘"
+        label = f" {grp} "
+        for i, ch in enumerate(label):
+            if x0 + 1 + i <= x1:
+                canvas[y0][x0 + 1 + i] = ch

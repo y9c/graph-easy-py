@@ -129,3 +129,30 @@ def test_double_and_rounded_borders():
     out = render(parse_graph("[ A ] { border: double; } --> [ B ] { shape: rounded; }"))
     assert "═" in out  # double border
     assert "╭" in out  # rounded corner
+
+
+def test_group_parses_and_frames_nodes():
+    g = parse_graph("( Pipeline [ Input ] --> [ Output ] )")
+    assert g.nodes["Input"].attrs.get("group") == "Pipeline"
+    assert g.nodes["Output"].attrs.get("group") == "Pipeline"
+    out = render(g)
+    assert "Pipeline" in out  # group label on the frame
+
+
+def test_filled_arrowhead():
+    g = parse_graph("[ A ] -- { arrowshape: filled; } --> [ B ]")
+    assert g.edges[0].attrs.get("arrowshape") == "filled"
+    out = render(g)
+    assert "▶" in out
+
+
+def test_color_attrs_when_enabled():
+    g = parse_graph("[ A ] { fill: red; color: white; } --> [ B ]")
+    out = render(g, color=True)
+    assert "\x1b[41" in out  # red background
+    assert ";37" in out  # white foreground
+
+
+def test_color_attrs_disabled_by_default():
+    g = parse_graph("[ A ] { fill: red; } --> [ B ]")
+    assert "\x1b[" not in render(g)
