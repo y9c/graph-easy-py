@@ -342,23 +342,47 @@ def _draw_groups(
     graph: Graph,
     box: _BoxChars,
 ) -> None:
-    """Draw a labelled dashed frame around each group's nodes."""
+    """Draw a labelled dashed frame around each group's nodes.
+
+    Groups whose bounding boxes overlap (shared nodes) are merged into a
+    single combined frame with a combined label.
+    """
     by_group: dict[str, list[str]] = {}
     for n in graph.nodes:
         grp = graph.nodes[n].attrs.get("group")
         if grp and n in pos:
-            by_group.setdefault(grp, []).append(n)
-    for grp, members in by_group.items():
+            for g in grp.split(","):
+                by_group.setdefault(g, []).append(n)
+
+    def bbox(members: list[str]) -> tuple[int, int, int, int]:
         xs = [pos[m][0] for m in members]
         ys = [pos[m][1] for m in members]
         xe = [pos[m][0] + pos[m][2] for m in members]
         ye = [pos[m][1] + pos[m][3] for m in members]
-        x0, x1 = min(xs) - 1, max(xe) + 1
-        y0, y1 = min(ys) - 1, max(ye) + 1
-        x0 = max(x0, 0)
-        y0 = max(y0, 0)
-        x1 = min(x1, len(canvas[0]) - 1)
-        y1 = min(y1, len(canvas) - 1)
+        x0, x1 = max(min(xs) - 1, 0), min(max(xe) + 1, len(canvas[0]) - 1)
+        y0, y1 = max(min(ys) - 1, 0), min(max(ye) + 1, len(canvas) - 1)
+        return x0, y0, x1, y1
+
+    def overlap(a: tuple, b: tuple) -> bool:
+        return not (a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1])
+
+    groups = list(by_group.items())
+    merged: list[list[str | set[str]]] = []
+    for grp, members in groups:
+        bb = bbox(members)
+        target: int | None = None
+        for idx, (g2, m2) in enumerate(merged):
+            if overlap(bb, bbox(list(m2))):
+                target = idx
+                break
+        if target is None:
+            merged.append([grp, set(members)])
+        else:
+            merged[target][0] = f"{merged[target][0]} | {grp}"
+            merged[target][1].update(members)
+
+    for grp, members in merged:
+        x0, y0, x1, y1 = bbox(list(members))
         for x in range(x0, x1 + 1):
             if canvas[y0][x] == " ":
                 canvas[y0][x] = "─"

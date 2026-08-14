@@ -139,6 +139,28 @@ def test_group_parses_and_frames_nodes():
     assert "Pipeline" in out  # group label on the frame
 
 
+def test_group_name_with_spaces():
+    g = parse_graph("( Stage 1 - QC [ A ] --> [ B ] )")
+    assert g.nodes["A"].attrs.get("group") == "Stage 1 - QC"
+    out = render(g)
+    assert "Stage 1 - QC" in out
+
+
+def test_shared_node_belongs_to_multiple_groups():
+    g = parse_graph("( G One [ A ] --> [ B ] )\n( G Two [ B ] --> [ C ] )")
+    assert "G One" in g.nodes["B"].attrs.get("group", "").split(",")
+    assert "G Two" in g.nodes["B"].attrs.get("group", "").split(",")
+    out = render(g)
+    # overlapping group frames merge into a single labelled frame
+    assert "G One" in out and "G Two" in out
+
+
+def test_disjoint_groups_render_separately():
+    out = render(parse_graph("( G1 [ X ] --> [ Y ] )\n( G2 [ P ] --> [ Q ] )"))
+    assert out.count("┌ G1") == 1
+    assert out.count("┌ G2") == 1
+
+
 def test_filled_arrowhead():
     g = parse_graph("[ A ] -- { arrowshape: filled; } --> [ B ]")
     assert g.edges[0].attrs.get("arrowshape") == "filled"
