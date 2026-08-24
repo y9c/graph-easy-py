@@ -19,7 +19,7 @@ classifiers = [
 requires-python = ">=3.10"
 
 [project.optional-dependencies]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "ruff>=0.4", "mypy>=1.8"]
 
 [project.urls]
 Original = "https://github.com/ironcamel/Graph-Easy"
@@ -30,5 +30,18 @@ graph-easy = "graph_easy.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+graph_easy = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+
+[tool.mypy]
+python_version = "3.10"

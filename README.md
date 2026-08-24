@@ -17,7 +17,7 @@ library and command-line tool.
   (at your option) any later version** — the same license as the original
   Graph::Easy, because a port is a derivative work.
 
-See [`LICENSE`](./LICENSE) for the full LGPL/ GPL text.
+See [`LICENSE`](./LICENSE) for the full GPL text.
 
 ### Third-party color schemes
 
@@ -32,25 +32,34 @@ See the header of the original `Graph::Easy::Attributes` for the full notice.
 Actively-developed port. Currently implemented:
 
 - **DSL parser**: `[ label ]`/bare nodes, `-->` `<--` `<-->` `--` arrows,
-  labelled edges (`-- label -->`), multiline labels (`\n`), comments
-- **Layout engine**: longest-path layering with orthogonal edge routing —
-  chains, branches, merges and cycles all render correctly; independent
-  components stack as separate diagrams
+  labelled edges (`-- label -->` and `-- { label: x; } -->`), multiline
+  labels (`\n`), node attribute blocks (`{ shape: diamond; }`), groups
+  (`( name [ A ] --> [ B ] )`), comments
+- **Layout engine**: longest-path layering with barycenter reordering and
+  orthogonal edge routing — chains, branches, merges, layer-spanning edges,
+  back edges (cycles) and self-loops all render without clobbering boxes
+  (long edges are routed through detour rows); independent components
+  stack as separate diagrams
 - **Edge line styles** (faithful to upstream `Parser::_edge_style`):
   `--` solid, `..` dotted, `==` double, `~~` wave, `##` bold, `.-`/`..-` dot-dash
+- **Edge labels** float in the box-free region next to the line (truncated
+  to fit)
 - **Two output charsets**: Unicode box-drawing by default
-  (`┌──┐ ──> ══ ║ ·`), plain ASCII via `--ascii`
+  (`┌──┐ ──▶ ══ ║ ·`), plain ASCII via `--ascii`
+- **Colours**: `fill`/`color` attributes map to ANSI codes (on by default,
+  `--no-color` / `--color auto` to control)
 
-The heavier automatic layout engine (`Graph::Easy::Layout` grid solver) is a
-follow-up milestone.
+Limitations: labels are clipped to the free space beside an edge; very dense
+graphs may need manual attribute tuning. The heavier automatic layout engine
+(`Graph::Easy::Layout` grid solver) is a follow-up milestone.
 
 ## Usage
 
 ```console
 $ printf '[ Bonn ] --> [ Berlin ] --> [ Hamburg ]\n' | graph-easy
-┌──────┐         ┌────────┐         ┌─────────┐
-│ Bonn │ ───────▶│ Berlin │ ───────▶│ Hamburg │
-└──────┘         └────────┘         └─────────┘
+┌──────┐     ┌────────┐     ┌─────────┐
+│ Bonn │────▶│ Berlin │────▶│ Hamburg │
+└──────┘     └────────┘     └─────────┘
 ```
 
 Colours from `fill`/`color` attributes are **on by default**; use
@@ -59,9 +68,9 @@ Colours from `fill`/`color` attributes are **on by default**; use
 ```console
 # plain-ASCII output
 $ printf '[ A ] ..> [ B ]\n' | graph-easy --ascii
-+---+         +---+
-| A | .......>| B |
-+---+         +---+
++---+     +---+
+| A |....>| B |
++---+     +---+
 ```
 
 ## Development
@@ -69,6 +78,8 @@ $ printf '[ A ] ..> [ B ]\n' | graph-easy --ascii
 ```console
 $ python -m venv .venv && source .venv/bin/activate
 $ pip install -e '.[dev]'
+$ ruff check .
+$ mypy src
 $ pytest
 ```
 
