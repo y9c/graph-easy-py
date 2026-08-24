@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from graph_easy import __version__
 from graph_easy.parser import parse_graph
 from graph_easy.render import render
 
@@ -18,6 +19,9 @@ def main(argv: list[str] | None = None) -> int:
         "file",
         nargs="?",
         help="read DSL from FILE instead of stdin ('-' = stdin)",
+    )
+    ap.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
     )
     ap.add_argument(
         "--ascii",
@@ -42,8 +46,12 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     if args.file and args.file != "-":
-        with open(args.file, encoding="utf-8") as fh:
-            text = fh.read()
+        try:
+            with open(args.file, encoding="utf-8") as fh:
+                text = fh.read()
+        except OSError as exc:
+            print(f"graph-easy: {exc}", file=sys.stderr)
+            return 1
     else:
         text = sys.stdin.read()
 

@@ -26,8 +26,6 @@ class Node:
     attr_label: str | None = None
     padding_x: int = 1
     padding_y: int = 0
-    _width: int = 0
-    _height: int = 0
     shape: str = "normal"
     attrs: dict[str, str] = field(default_factory=dict)
 
@@ -53,8 +51,3 @@ class Node:
     def height(self) -> int:
         """Total box height = 2 borders + padding_y*2 + inner_height."""
         return 2 + self.padding_y * 2 + self.inner_height()
-
-    def recompute(self) -> None:
-        """Recompute cached extents after label mutation (upstream api)."""
-        self._width = self.width()
-        self._height = self.height()

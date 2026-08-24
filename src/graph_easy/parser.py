@@ -71,7 +71,6 @@ class Graph:
 
     nodes: dict[str, Node] = field(default_factory=dict)
     edges: list[Edge] = field(default_factory=list)
-    link_labels: list[str] = field(default_factory=list)
 
     def add_node(self, label: str) -> Node:
         if label not in self.nodes:
@@ -199,9 +198,9 @@ def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
             e = Edge(source=prev, target=value)
             e.directed_to_target = pending_op.endswith(">")
             e.directed_from_source = pending_op.startswith("<")
-            e.label = pending_label
-            e.style = _edge_style(pending_op.strip("<>"))
             e.attrs = dict(pending_attrs)
+            e.label = pending_label or pending_attrs.get("label")
+            e.style = _edge_style(pending_op.strip("<>"))
             g.edges.append(e)
         elif pending_attrs:
             g.nodes[value].attrs.update(pending_attrs)
@@ -212,7 +211,7 @@ def _stitch(g: Graph, tokens: list[tuple[str, str]]) -> None:
         i += 1
 
 
-def parse_graph(text: str, *, link_as_default_label: bool = False) -> Graph:
+def parse_graph(text: str) -> Graph:
     """Parse graph DSL text into a :class:`Graph`."""
 
     g = Graph()
