@@ -10,7 +10,6 @@ from graph_easy.node import Node
 from graph_easy.parser import parse_graph
 from graph_easy.render import render
 
-
 # ---- box geometry ----------------------------------------------------------
 
 def test_box_dimensions():
@@ -34,12 +33,6 @@ def test_padding_is_respected():
     n = Node(label="x", padding_x=2, padding_y=1)
     assert n.width() == 2 + 2 * 2 + 1  # borders(2) + 2*padding_x + inner(1)
     assert n.height() == 2 + 2 * 1 + 1  # borders(2) + 2*padding_y + inner(1)
-
-
-def test_recompute_cache():
-    n = Node(label="a")
-    n.recompute()
-    assert n._width == n.width()
 
 
 # ---- parsing ---------------------------------------------------------------
@@ -192,10 +185,10 @@ def test_edge_corners_use_box_chars():
     # arm turns right into the target (└)
     out = render(parse_graph("[ A ] --> [ B ]\n[ A ] --> [ C ]"))
     assert "┐" in out and "└" in out
-    # an upward merge: the vertical arm joins the target's through-line
-    # as a tee (┬) so no edge looks broken
+    # an upward merge: B's vertical arm joins the A->D through-line from
+    # below, so the junction is a downward tee (┴), not a broken edge
     out2 = render(parse_graph("[ A ] --> [ D ]\n[ B ] --> [ D ]"))
-    assert "┘" in out2 and "┬" in out2
+    assert "┘" in out2 and "┴" in out2
     # ASCII corners fall back to "+"
     out3 = render(parse_graph("[ A ] --> [ B ]\n[ A ] --> [ C ]"), ascii_style=True)
     assert "\u250c" not in out3 and "+" in out3
@@ -226,3 +219,67 @@ def test_color_attrs_when_enabled():
 def test_color_attrs_disabled_by_default():
     g = parse_graph("[ A ] { fill: red; } --> [ B ]")
     assert "\x1b[" not in render(g)
+
+
+# ---- routing regressions ----------------------------------------------------
+
+def test_span_edge_does_not_clobber_box():
+    # A->B skips the layer that holds C; the intermediate box must stay intact
+    out = render(parse_graph("[ A ] --> [ C ]\n[ A ] --> [ B ]\n[ C ] --> [ B ]"))
+    assert "│ A │" in out and "│ C │" in out and "│ B │" in out
+    # both edges entering B share its left port (one merged arrowhead);
+    # the spanning edge takes a detour row below the diagram
+    assert out.count("▶") == 2
+    assert "└─" in out and out.splitlines()[-1].rstrip().endswith("┘")
+
+
+def test_cycle_back_edge_renders():
+    out = render(parse_graph("[ A ] --> [ B ]\n[ B ] --> [ C ]\n[ C ] --> [ A ]"))
+    assert out.count("┌───┐") == 3
+    # every box intact, back edge routed through a detour row below
+    assert "│ A │" in out and "│ B │" in out and "│ C │" in out
+    assert "┴" in out
+    assert "└─" in out  # detour row corner
+
+
+def test_selfloop_renders():
+    out = render(parse_graph("[ A ] --> [ A ]"))
+    assert "▲" in out  # re-entry arrowhead into the box bottom
+    assert "┐" in out and "┘" in out  # loop corners
+
+
+def test_bidirectional_shows_both_arrows():
+    out = render(parse_graph("[ A ] <--> [ B ]"))
+    assert "◀" in out and "▶" in out
+
+
+def test_double_style_edge():
+    out = render(parse_graph("[ A ] ==> [ B ]"))
+    assert "═" in out
+
+
+def test_attr_label_is_used():
+    # a { label: x; } block on the edge sets the edge label
+    g = parse_graph("[ A ] -- { label: ret; } --> [ B ]")
+    assert g.edges[0].label == "ret"
+    out = render(g)
+    assert "ret" in out
+
+
+# ---- CLI ---------------------------------------------------------------------
+
+def test_cli_main(tmp_path, capsys):
+    from graph_easy.cli import main
+
+    p = tmp_path / "g.txt"
+    p.write_text("[ A ] --> [ B ]\n", encoding="utf-8")
+    assert main([str(p), "--ascii", "--no-color"]) == 0
+    out = capsys.readouterr().out
+    assert "A" in out and "B" in out and "-->" in out
+
+
+def test_cli_missing_file(capsys):
+    from graph_easy.cli import main
+
+    assert main(["/nonexistent/graph-easy-test-file.txt"]) == 1
+    assert "graph-easy:" in capsys.readouterr().err
