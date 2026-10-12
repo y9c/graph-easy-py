@@ -6,6 +6,8 @@ fundamental box-geometry invariants.
 
 from __future__ import annotations
 
+import pytest
+
 from graph_easy.node import Node
 from graph_easy.parser import parse_graph
 from graph_easy.render import render
@@ -222,6 +224,29 @@ def test_color_attrs_disabled_by_default():
 
 
 # ---- routing regressions ----------------------------------------------------
+
+@pytest.mark.parametrize("ascii_style", [False, True])
+@pytest.mark.parametrize(
+    ("text", "source", "arrow_count"),
+    [
+        ("[ A ] --> [ C ]\n[ B ] --> [ C ]", "B", 1),
+        ("[ A ] --> [ B ]\n[ A ] --> [ C ]", "A", 2),
+        ("[ A ] --> [ B ] --> [ D ]\n[ A ] --> [ C ] --> [ D ]", "C", 3),
+    ],
+)
+def test_adjacent_bent_edges_leave_source_center(text, source, arrow_count, ascii_style):
+    """Bent branches and merges leave the source center without extending its bottom border."""
+    out = render(parse_graph(text), ascii_style=ascii_style)
+    lines = out.splitlines()
+    border = "|" if ascii_style else "│"
+    label = f"{border} {source} {border}"
+    y = next(i for i, line in enumerate(lines) if label in line)
+    x = lines[y].index(label) + len(label)
+    horizontal = "-" if ascii_style else "─"
+    assert lines[y][x] == horizontal
+    assert len(lines[y + 1]) <= x or lines[y + 1][x] == " "
+    assert out.count(">" if ascii_style else "▶") == arrow_count
+
 
 def test_span_edge_does_not_clobber_box():
     # A->B skips the layer that holds C; the intermediate box must stay intact

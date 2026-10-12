@@ -782,8 +782,8 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
                 cx = (sx + tx) // 2 if tx - sx > _CHANNEL else sx + _CHANNEL // 2
                 _draw_z(
                     cv, e, cs,
-                    sx=sx, y1=sy_exit, cx=cx, tx_border=tx, y2=ty_mid,
-                    label_x0=sx, label_x1=colx[s + 1] - 1, label_y=sy_exit - 1,
+                    sx=sx, y1=sy_mid, cx=cx, tx_border=tx, y2=ty_mid,
+                    label_x0=sx, label_x1=colx[s + 1] - 1, label_y=sy_mid - 1,
                 )
             elif route.kind == "spanz":
                 cx_s = colx[s] + col_w[s] + _CHANNEL // 2
