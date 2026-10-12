@@ -176,8 +176,8 @@ class _Canvas:
             # corner mask yields a corner glyph, not a bare line char.
             self.cells[y][x] = cs.join.get(mask, ch)
             return
-        if cur == ch:
-            return
+        # Equal glyphs can contribute different directions (e.g. a corner
+        # joining a horizontal run), so their masks must still be merged.
         m_cur = cs.mask_of.get(cur)
         if m_cur is None:
             return

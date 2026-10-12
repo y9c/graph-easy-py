@@ -248,6 +248,29 @@ def test_adjacent_bent_edges_leave_source_center(text, source, arrow_count, asci
     assert out.count(">" if ascii_style else "▶") == arrow_count
 
 
+@pytest.mark.parametrize("ascii_style", [False, True])
+@pytest.mark.parametrize("reverse_edges", [False, True])
+@pytest.mark.parametrize("diamond", [False, True])
+def test_branch_junction_stays_connected(ascii_style, reverse_edges, diamond):
+    """Shared branch ports remain connected regardless of edge drawing order."""
+    edges = ["[ A ] --> [ B ]", "[ A ] --> [ C ]"]
+    if reverse_edges:
+        edges.reverse()
+    if diamond:
+        edges.extend(["[ B ] --> [ D ]", "[ C ] --> [ D ]"])
+    lines = render(parse_graph("\n".join(edges)), ascii_style=ascii_style).splitlines()
+    vertical = "|" if ascii_style else "│"
+    source = f"{vertical} A {vertical}"
+    y = next(i for i, line in enumerate(lines) if source in line)
+    source_end = lines[y].index(source) + len(source)
+    junction_x = next(
+        x for x in range(source_end, len(lines[y + 1])) if lines[y + 1][x] == vertical
+    )
+    # T-junction orientation is covered by the separate Unicode mapping fix.
+    junctions = {"+"} if ascii_style else {"┬", "┴"}
+    assert lines[y][junction_x] in junctions
+
+
 def test_span_edge_does_not_clobber_box():
     # A->B skips the layer that holds C; the intermediate box must stay intact
     out = render(parse_graph("[ A ] --> [ C ]\n[ A ] --> [ B ]\n[ C ] --> [ B ]"))
