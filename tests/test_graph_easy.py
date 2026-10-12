@@ -259,7 +259,7 @@ def test_branch_junction_stays_connected(ascii_style):
     y = next(i for i, line in enumerate(lines) if source in line)
     source_end = lines[y].index(source) + len(source)
     junction_x = next(
-        x for x in range(source_end, len(lines[y + 1])) if lines[y + 1][x] == vertical
+        x for x in range(source_end, len(lines[y + 2])) if lines[y + 2][x] == vertical
     )
     # T-junction orientation is covered by the separate Unicode mapping fix.
     junctions = {"+"} if ascii_style else {"┬", "┴"}
