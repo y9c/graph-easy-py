@@ -271,6 +271,55 @@ def test_branch_junction_stays_connected(ascii_style, reverse_edges, diamond):
     assert lines[y][junction_x] in junctions
 
 
+@pytest.mark.parametrize("ascii_style", [False, True])
+def test_codex_task_dag_keeps_branch_and_merge_connected(ascii_style):
+    """The real Codex task graph keeps both shared ports and the cleanup chain connected."""
+    graph = parse_graph(
+        "[ codex-config ]\n[ codex-cli ]\n[ codex-daemon ]\n"
+        "[ codex-plugin ]\n[ codex-cleanup ]\n"
+        "[ codex-config ] --> [ codex-cli ]\n"
+        "[ codex-cli ] --> [ codex-daemon ]\n"
+        "[ codex-plugin ] --> [ codex-daemon ]\n"
+        "[ codex-config ] --> [ codex-plugin ]\n"
+        "[ codex-daemon ] --> [ codex-cleanup ]\n"
+    )
+    output = render(graph, ascii_style=ascii_style)
+    lines = output.splitlines()
+    vertical = "|" if ascii_style else "│"
+    horizontal = "-" if ascii_style else "─"
+    arrow = ">" if ascii_style else "▶"
+    positions = {}
+    for name in graph.nodes:
+        label = f"{vertical} {name} {vertical}"
+        assert output.count(label) == 1
+        y = next(i for i, line in enumerate(lines) if label in line)
+        x = lines[y].index(label)
+        positions[name] = (x, y, x + len(label))
+    config, cli, daemon, plugin, cleanup = (
+        positions[name]
+        for name in ("codex-config", "codex-cli", "codex-daemon", "codex-plugin", "codex-cleanup")
+    )
+    assert config[1] == cli[1] == daemon[1] == cleanup[1] < plugin[1]
+    # This PR checks connectivity; the independent mapping fix covers T orientation.
+    junctions = {"+"} if ascii_style else {"┬", "┴"}
+    for left, right, corner in (
+        (config, cli, "+" if ascii_style else "└"),
+        (cli, daemon, "+" if ascii_style else "┘"),
+    ):
+        junction_x = next(
+            x for x in range(left[2], right[0]) if lines[left[1] + 1][x] == vertical
+        )
+        assert lines[left[1]][junction_x] in junctions
+        assert all(lines[y][junction_x] == vertical for y in range(left[1] + 1, plugin[1]))
+        assert lines[plugin[1]][junction_x] == corner
+    assert lines[plugin[1]][plugin[0] - 1] == arrow
+    assert lines[plugin[1]][plugin[2]] == horizontal
+    cleanup_link = horizontal * (cleanup[0] - daemon[2] - 1) + arrow
+    assert lines[daemon[1]][daemon[2] : cleanup[0]] == cleanup_link
+    # Both inputs to the daemon share one arrowhead, so five edges have four arrows.
+    assert output.count(arrow) == 4
+
+
 def test_span_edge_does_not_clobber_box():
     # A->B skips the layer that holds C; the intermediate box must stay intact
     out = render(parse_graph("[ A ] --> [ C ]\n[ A ] --> [ B ]\n[ C ] --> [ B ]"))
