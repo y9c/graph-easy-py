@@ -176,11 +176,13 @@ class _Canvas:
             # corner mask yields a corner glyph, not a bare line char.
             self.cells[y][x] = cs.join.get(mask, ch)
             return
+
         # if cur == ch:
         #     return
         # This shortcut is incorrect: matching glyphs do not imply matching
         # connection masks. A corner joining an existing horizontal line
         # must still add its vertical connection.
+
         m_cur = cs.mask_of.get(cur)
         if m_cur is None:
             return
