@@ -426,6 +426,32 @@ def test_cli_missing_file(capsys):
     assert "graph-easy:" in capsys.readouterr().err
 
 
+def test_to_dot_maps_nodes_and_edges():
+    from graph_easy.export import to_dot
+
+    g = parse_graph(
+        "[ A ] { shape: diamond; color: red; } --> [ B ]\n[ B ] -- { label: link; } ..> [ C ]\n"
+    )
+    dot = to_dot(g)
+    assert dot.startswith("digraph G {")
+    assert '"A" [shape=diamond' in dot
+    assert '"A" -> "B"' in dot
+    assert "style=dotted" in dot
+    assert 'label="link"' in dot
+    assert dot.endswith("}\n")
+
+
+def test_cli_dot_output(tmp_path, capsys):
+    from graph_easy.cli import main
+
+    p = tmp_path / "g.ge"
+    p.write_text("[ A ] --> [ B ]\n", encoding="utf-8")
+    assert main([str(p), "--dot"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("digraph G {")
+    assert '"A" -> "B"' in out
+
+
 def test_bent_edge_does_not_clobber_unrelated_node_border():
     # issue #5: B -> C must not run its vertical along Longest's right
     # border. Longest is a leaf; its box border must stay intact (no fused

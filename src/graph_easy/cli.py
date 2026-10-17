@@ -6,6 +6,7 @@ import argparse
 import sys
 
 from graph_easy import __version__
+from graph_easy.export import graphviz_available, render_dot, to_dot
 from graph_easy.parser import parse_graph
 from graph_easy.render import render
 
@@ -40,7 +41,24 @@ def main(argv: list[str] | None = None) -> int:
         const="off",
         help="disable ANSI colours",
     )
-    ap.set_defaults(color="on")
+    ap.add_argument(
+        "--dot",
+        action="store_const",
+        const="dot",
+        dest="format",
+        help="output Graphviz DOT instead of ASCII art",
+    )
+    ap.add_argument(
+        "--format",
+        choices=["dot", "svg", "png"],
+        help="output format (dot/svg/png; svg/png require the 'dot' binary)",
+    )
+    ap.add_argument(
+        "--engine",
+        default="dot",
+        help="graphviz layout engine for svg/png output (default: dot)",
+    )
+    ap.set_defaults(color="on", format=None)
     args = ap.parse_args(argv)
 
     if args.file and args.file != "-":
@@ -53,13 +71,31 @@ def main(argv: list[str] | None = None) -> int:
     else:
         text = sys.stdin.read()
 
+    graph = parse_graph(text)
+    fmt = args.format
+    if fmt:
+        if fmt == "dot":
+            sys.stdout.write(to_dot(graph))
+            return 0
+        result = render_dot(graph, fmt, engine=args.engine)
+        if result is None:
+            if not graphviz_available():
+                print(
+                    f"graph-easy: the 'dot' binary is required for '{fmt}' output ",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"graph-easy: could not render '{fmt}'", file=sys.stderr)
+            return 1
+        sys.stdout.buffer.write(result)
+        return 0
+
     if args.color == "auto":
         args.color = sys.stdout.isatty()
     elif args.color == "on":
         args.color = True
     else:
         args.color = False
-    graph = parse_graph(text)
     output = render(graph, ascii_style=args.ascii, color=args.color)
     sys.stdout.write(output + "\n")
     return 0

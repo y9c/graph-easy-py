@@ -56,6 +56,8 @@ Actively-developed port. Currently implemented:
   index (e.g. `color: 3; scheme: blues5`).
 - **Node shapes**: `normal`/`box` (rectangle), `rounded`/`ellipse`/`circle`/
   `oval`, `diamond`, and `hexagon`, set via `shape: <name>`.
+- **Graphviz export**: `--dot` (or `--format dot`) emits Graphviz DOT;
+  `--format svg|png` renders via the `dot` binary when available.
 
 Limitations: labels are clipped to the free space beside an edge; very dense
 graphs may need manual attribute tuning. The heavier automatic layout engine
