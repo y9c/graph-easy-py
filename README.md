@@ -72,8 +72,8 @@ $ printf '[ Bonn ] --> [ Berlin ] --> [ Hamburg ]\n' | graph-easy
 └──────┘     └────────┘     └─────────┘
 ```
 
-Colours from `fill`/`color` attributes are **on by default**; use
-`--no-color` to disable, or `--color auto` to enable only on a TTY.
+Colours from `fill`/`color` attributes render **only on a TTY** by default
+(`--color on` to force, `--no-color` to disable).
 
 ```console
 # plain-ASCII output

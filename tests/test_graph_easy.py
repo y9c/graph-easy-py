@@ -129,7 +129,7 @@ def test_node_attribute_block_applies_shape():
     g = parse_graph("[ Start ] { shape: diamond; } --> [ A ]")
     assert g.nodes["Start"].attrs.get("shape") == "diamond"
     out = render(g)
-    assert "/" in out and "\\" in out
+    assert "╱" in out and "╲" in out  # box-drawing slanted diamond edges
 
 
 def test_unknown_attribute_falls_back_to_normal_box():
@@ -145,7 +145,7 @@ def test_double_and_rounded_borders():
 
 def test_hexagon_shape_renders():
     out = render(parse_graph("[ Start ] { shape: hexagon; } --> [ End ]"))
-    assert "/" in out and "\\" in out  # slanted hexagon top/bottom
+    assert "╱" in out and "╲" in out  # box-drawing slanted hexagon edges
     assert "Start" in out
 
 

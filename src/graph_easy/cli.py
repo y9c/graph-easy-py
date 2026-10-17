@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         nargs="?",
         const="on",
         choices=["on", "off", "auto"],
-        help="apply ANSI colours (default: on; 'auto' = only when output is a TTY)",
+        help="apply ANSI colours (default: auto, i.e. only on a TTY)",
     )
     ap.add_argument(
         "--no-color",
@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
         default="dot",
         help="graphviz layout engine for svg/png output (default: dot)",
     )
-    ap.set_defaults(color="on", format=None)
+    ap.set_defaults(color="auto", format=None)
     args = ap.parse_args(argv)
 
     if args.file and args.file != "-":

@@ -633,53 +633,59 @@ def _box(node: Node, box: _BoxChars) -> list[str]:
 
 
 def _box_diamond(node: Node, border: str, box: _BoxChars) -> list[str]:
-    """Diamond (rhombus) node — label centered on the widest diagonal row."""
+    """Diamond (rhombus) node — box-drawing slanted edges, uniform width.
+
+    The slanted top/bottom edges and the label band all span the same width
+    (``band`` cells) and the label is centred inside it, so the node is a
+    regular box footprint the layout engine can position; edges enter/exit
+    the label row cleanly.
+    """
     _, _, _, _, v, h = box
     hch = "═" if border == "double" else h
     vch = "║" if border == "double" else v
+    s1 = "═" if border == "double" else "╱"
+    s2 = "═" if border == "double" else "╲"
     lines = node.label_lines()
-    inner_w = node.inner_width()
-    half = inner_w // 2
-    width = inner_w + 4
-    total_rows = len(lines) + 2
+    band = node.inner_width()
     rows: list[str] = []
-    for r in range(total_rows):
+    for r in range(len(lines) + 2):
         if r == 0:
-            row = " " * (half + 1) + "/" + hch * max(inner_w - 2, 1) + "\\"
-        elif r == total_rows - 1:
-            row = " " * (half + 1) + "\\" + hch * max(inner_w - 2, 1) + "/"
+            rows.append(s1 + hch * band + s2)
+        elif r == len(lines) + 1:
+            rows.append(s2 + hch * band + s1)
         else:
             li = r - 1
-            pad = abs(half - li)
             text = lines[li] if li < len(lines) else ""
-            left_pad = " " * (pad + 1)
-            right_pad = " " * (max(inner_w - display_width(text), 0) + pad + 1)
-            row = left_pad + vch + text + right_pad + vch
-        rows.append(row.ljust(width))
+            tw = display_width(text)
+            left = max(band - tw, 0) // 2
+            right = max(band - tw - left, 0)
+            rows.append(vch + " " * left + text + " " * right + vch)
     return rows
 
 
 def _box_hexagon(node: Node, border: str, box: _BoxChars) -> list[str]:
-    """Hexagon node — slanted top/bottom edges with a horizontal label band."""
+    """Hexagon node — box-drawing slanted edges with a horizontal label band."""
     _, _, _, _, v, h = box
     hch = "═" if border == "double" else h
     vch = "║" if border == "double" else v
+    s1 = "═" if border == "double" else "╱"
+    s2 = "═" if border == "double" else "╲"
     lines = node.label_lines()
     inner_w = node.inner_width()
-    width = inner_w + 4
-    total_rows = len(lines) + 2
+    band = inner_w
     rows: list[str] = []
-    for r in range(total_rows):
+    for r in range(len(lines) + 2):
         if r == 0:
-            row = " " + "/" + hch * max(inner_w, 2) + "\\"
-        elif r == total_rows - 1:
-            row = " " + "\\" + hch * max(inner_w, 2) + "/"
+            rows.append(" " + s1 + hch * band + s2)
+        elif r == len(lines) + 1:
+            rows.append(" " + s2 + hch * band + s1)
         else:
             li = r - 1
             text = lines[li] if li < len(lines) else ""
-            right = max(inner_w - display_width(text), 0)
-            row = " " + vch + " " + text + " " * right + " " + vch
-        rows.append(row.ljust(width))
+            tw = display_width(text)
+            left = max(band - tw, 0) // 2
+            right = max(band - tw - left, 0)
+            rows.append(" " + vch + " " * left + text + " " * right + vch)
     return rows
 
 
