@@ -116,7 +116,10 @@ def _tokens(line: str) -> list[tuple[str, str]]:
                 out.append(("group_open", ""))
                 nxt = line.find("[", pos)
                 if nxt != -1:
-                    name = line[pos:nxt].strip()
+                    # Group name is everything up to the first node. Guard
+                    # against a stray ')' / empty name from a malformed
+                    # "( )" or "( name )" group.
+                    name = line[pos:nxt].strip().rstrip(")").strip()
                     if name:
                         out.append(("group_name", name))
                     pos = nxt - 1

@@ -157,6 +157,24 @@ def test_group_name_with_spaces():
     assert "Stage 1 - QC" in out
 
 
+def test_empty_group_name_is_ignored():
+    # a stray "( )" (no group name) must not create a frame labelled ")"
+    g = parse_graph("( ) [ A ]")
+    assert "A" in g.nodes
+    assert not g.nodes["A"].attrs.get("group")
+    out = render(g)
+    assert "┌───┐" in out
+    assert "┌ )" not in out
+
+
+def test_group_name_with_trailing_close_paren_is_cleaned():
+    # "( name )" leaves a trailing ')' before the node; it must not leak
+    # into the group label.
+    out = render(parse_graph("( Pipeline ) [ A ] --> [ B ]"))
+    assert "Pipeline" in out
+    assert "Pipeline)" not in out
+
+
 def test_shared_node_belongs_to_multiple_groups():
     g = parse_graph("( G One [ A ] --> [ B ] )\n( G Two [ B ] --> [ C ] )")
     assert "G One" in g.nodes["B"].attrs.get("group", "").split(",")
