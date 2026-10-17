@@ -91,6 +91,8 @@ _JOIN_ASCII = {
 }
 
 # ANSI colour table — the 16 standard terminal colours plus common names.
+# Named colours map to classic SGR codes; ``#RRGGBB``/``#RGB`` map to
+# 24-bit true-colour. See ``_fg_sgr``/``_bg_sgr``.
 _ANSI_FG: dict[str, str] = {
     "black": "30",
     "red": "31",
@@ -130,13 +132,247 @@ _ANSI_BG: dict[str, str] = {
     "brightwhite": "107",
 }
 
+_ASSOC_NAMES: dict[str, tuple[int, int, int]] = {
+    "navy": (0, 0, 128),
+    "darkblue": (0, 0, 139),
+    "blue": (0, 0, 255),
+    "mediumblue": (0, 0, 205),
+    "royalblue": (65, 105, 225),
+    "steelblue": (70, 130, 180),
+    "cornflowerblue": (100, 149, 237),
+    "dodgerblue": (30, 144, 255),
+    "deepskyblue": (0, 191, 255),
+    "lightskyblue": (135, 206, 250),
+    "lightblue": (173, 216, 230),
+    "skyblue": (135, 206, 235),
+    "teal": (0, 128, 128),
+    "darkcyan": (0, 139, 139),
+    "cyan": (0, 255, 255),
+    "turquoise": (64, 224, 208),
+    "darkgreen": (0, 100, 0),
+    "green": (0, 128, 0),
+    "forestgreen": (34, 139, 34),
+    "limegreen": (50, 205, 50),
+    "lime": (0, 255, 0),
+    "seagreen": (46, 139, 87),
+    "olive": (128, 128, 0),
+    "darkgoldenrod": (184, 134, 11),
+    "olivedrab": (107, 142, 35),
+    "yellow": (255, 255, 0),
+    "gold": (255, 215, 0),
+    "orange": (255, 165, 0),
+    "darkorange": (255, 140, 0),
+    "orangered": (255, 69, 0),
+    "maroon": (128, 0, 0),
+    "darkred": (139, 0, 0),
+    "red": (255, 0, 0),
+    "firebrick": (178, 34, 34),
+    "crimson": (220, 20, 60),
+    "indianred": (205, 92, 92),
+    "pink": (255, 192, 203),
+    "hotpink": (255, 105, 180),
+    "deeppink": (255, 20, 147),
+    "magenta": (255, 0, 255),
+    "purple": (128, 0, 128),
+    "darkorchid": (153, 50, 204),
+    "violet": (238, 130, 238),
+    "plum": (221, 160, 221),
+    "orchid": (218, 112, 214),
+    "brown": (165, 42, 42),
+    "saddlebrown": (139, 69, 19),
+    "chocolate": (210, 105, 30),
+    "peru": (205, 133, 63),
+    "sienna": (160, 82, 45),
+    "tan": (210, 180, 140),
+    "silver": (192, 192, 192),
+    "gray": (128, 128, 128),
+    "grey": (128, 128, 128),
+    "slategray": (112, 128, 144),
+    "dimgray": (105, 105, 105),
+    "white": (255, 255, 255),
+    "snow": (255, 250, 250),
+    "lightgray": (211, 211, 211),
+    "aliceblue": (240, 248, 255),
+    "beige": (245, 245, 220),
+    "ivory": (255, 255, 240),
+    "cornsilk": (255, 248, 220),
+    "wheat": (245, 222, 179),
+    "khaki": (240, 230, 140),
+    "goldenrod": (218, 165, 32),
+    "salmon": (250, 128, 114),
+    "coral": (255, 127, 80),
+    "tomato": (255, 99, 71),
+    "lavender": (230, 230, 250),
+}
 
-def _ansi_fg(name: str) -> str:
-    return _ANSI_FG.get(name.strip().lower(), "")
+# ColourBrewer palettes (subset of the most common sequential / diverging /
+# qualitative schemes), used via ``color: <index>; scheme: <name><n>``.
+# Each value is a list of (r, g, b) triples indexed from 1.
+_BREWER: dict[str, tuple[tuple[int, int, int], ...]] = {
+    "blues3": ((222, 235, 247), (158, 202, 225), (49, 130, 189)),
+    "blues5": ((239, 243, 255), (189, 215, 231), (107, 174, 214), (49, 130, 189), (8, 81, 156)),
+    "greens3": ((229, 245, 224), (161, 217, 155), (49, 163, 84)),
+    "greens5": ((237, 248, 233), (186, 228, 179), (116, 196, 118), (49, 163, 84), (0, 109, 44)),
+    "oranges3": ((254, 230, 206), (253, 174, 107), (230, 85, 13)),
+    "oranges5": ((254, 237, 222), (253, 190, 133), (253, 141, 60), (230, 85, 13), (166, 54, 3)),
+    "purples3": ((239, 237, 245), (188, 189, 220), (117, 107, 177)),
+    "purples5": ((242, 240, 247), (203, 201, 226), (158, 154, 200), (117, 107, 177), (84, 39, 143)),
+    "reds3": ((254, 224, 210), (252, 146, 114), (222, 45, 38)),
+    "reds5": ((254, 229, 217), (252, 174, 145), (251, 106, 74), (222, 45, 38), (165, 0, 38)),
+    "greys3": ((240, 240, 240), (189, 189, 189), (99, 99, 99)),
+    "greys5": ((247, 247, 247), (204, 204, 204), (150, 150, 150), (99, 99, 99), (37, 37, 37)),
+    "rdbu3": ((239, 138, 98), (247, 247, 247), (103, 169, 207)),
+    "rdbu5": ((202, 0, 32), (244, 165, 130), (247, 247, 247), (146, 197, 222), (5, 113, 176)),
+    "piyg3": ((233, 163, 201), (247, 247, 247), (161, 215, 106)),
+    "piyg5": ((208, 28, 139), (241, 182, 218), (247, 247, 247), (184, 225, 134), (77, 172, 38)),
+    "brbg3": ((216, 179, 101), (245, 245, 245), (90, 180, 172)),
+    "brbg5": ((166, 97, 26), (223, 194, 125), (245, 245, 245), (128, 205, 193), (1, 133, 113)),
+    "set1": (
+        (228, 26, 28),
+        (55, 126, 184),
+        (77, 175, 74),
+        (152, 78, 163),
+        (255, 127, 0),
+        (255, 255, 51),
+        (166, 86, 40),
+        (247, 129, 191),
+        (153, 153, 153),
+    ),
+    "set2": (
+        (102, 194, 165),
+        (252, 141, 98),
+        (141, 160, 203),
+        (231, 138, 195),
+        (166, 216, 84),
+        (255, 217, 47),
+        (229, 196, 148),
+        (179, 179, 179),
+    ),
+    "set3": (
+        (141, 211, 199),
+        (255, 255, 179),
+        (190, 186, 218),
+        (251, 128, 114),
+        (128, 177, 211),
+        (253, 180, 98),
+        (179, 222, 105),
+        (252, 205, 229),
+        (217, 217, 217),
+    ),
+    "paired": (
+        (166, 206, 227),
+        (31, 120, 180),
+        (178, 223, 138),
+        (51, 160, 44),
+        (251, 154, 153),
+        (227, 26, 28),
+        (253, 191, 111),
+        (255, 127, 0),
+        (202, 178, 214),
+        (106, 61, 154),
+        (255, 255, 153),
+        (177, 89, 40),
+    ),
+    "accent": (
+        (127, 201, 127),
+        (190, 174, 212),
+        (253, 192, 134),
+        (255, 255, 153),
+        (56, 108, 176),
+        (240, 2, 127),
+        (191, 91, 23),
+        (102, 102, 102),
+    ),
+    "dark2": (
+        (27, 158, 119),
+        (217, 95, 2),
+        (117, 112, 179),
+        (231, 41, 138),
+        (102, 166, 30),
+        (230, 171, 2),
+        (166, 118, 29),
+        (102, 102, 102),
+    ),
+}
 
 
-def _ansi_bg(name: str) -> str:
-    return _ANSI_BG.get(name.strip().lower(), "")
+class _ColorError(ValueError):
+    """Raised for an unrecognised colour value."""
+
+
+def _parse_rgb(value: str) -> tuple[int, int, int]:
+    """Resolve a colour value to an (r, g, b) triple.
+
+    Accepts ``#RRGGBB``, ``#RGB`` shorthand, a named colour from the extended
+    table, or one of the 16 classic ANSI colour names. Returns the triple.
+    """
+    v = value.strip().lower()
+    if v.startswith("#"):
+        hexs = v[1:]
+        if len(hexs) == 3:
+            hexs = "".join(c * 2 for c in hexs)
+        if len(hexs) != 6 or not all(c in "0123456789abcdef" for c in hexs):
+            raise _ColorError(f"invalid hex colour {value!r}")
+        return tuple(int(hexs[i : i + 2], 16) for i in (0, 2, 4))  # type: ignore[return-value]
+    if v in _ASSOC_NAMES:
+        return _ASSOC_NAMES[v]
+    named = {
+        "black": (0, 0, 0),
+        "red": (255, 0, 0),
+        "green": (0, 128, 0),
+        "yellow": (255, 255, 0),
+        "blue": (0, 0, 255),
+        "magenta": (255, 0, 255),
+        "cyan": (0, 255, 255),
+        "white": (255, 255, 255),
+        "grey": (128, 128, 128),
+        "gray": (128, 128, 128),
+    }
+    if v in named:
+        return named[v]
+    raise _ColorError(f"unknown colour {value!r}")
+
+
+def _resolve_rgb(value: str, scheme: str | None = None) -> tuple[int, int, int]:
+    """Resolve a colour to (r, g, b), honouring a ColourBrewer ``scheme``.
+
+    ``scheme`` is used only when ``value`` is a 1-based index into a Brewery
+    palette (e.g. ``color: 3; scheme: blues5``). Otherwise falls back to the
+    named / hex parsing in :func:`_parse_rgb`.
+    """
+    v = value.strip().lower()
+    if scheme and (v.isdigit() or v.startswith("#")):
+        key = scheme.strip().lower()
+        if key in _BREWER and v.isdigit():
+            idx = int(v)
+            pal = _BREWER[key]
+            if 1 <= idx <= len(pal):
+                return pal[idx - 1]
+    return _parse_rgb(value)
+
+
+def _fg_sgr(name: str, scheme: str | None = None) -> str:
+    """Return the SGR parameter string for a foreground colour ('' if unknown)."""
+    v = name.strip().lower()
+    if v in _ANSI_FG:
+        return _ANSI_FG[v]
+    try:
+        r, g, b = _resolve_rgb(v, scheme)
+    except _ColorError:
+        return ""
+    return f"38;2;{r};{g};{b}"
+
+
+def _bg_sgr(name: str, scheme: str | None = None) -> str:
+    """Return the SGR parameter string for a background colour ('' if unknown)."""
+    v = name.strip().lower()
+    if v in _ANSI_BG:
+        return _ANSI_BG[v]
+    try:
+        r, g, b = _resolve_rgb(v, scheme)
+    except _ColorError:
+        return ""
+    return f"48;2;{r};{g};{b}"
 
 
 @dataclass
@@ -300,20 +536,44 @@ class _Canvas:
 
 
 def _apply_color(cv: _Canvas, pos: dict, graph: Graph) -> None:
-    """Post-process: wrap each node's interior rows in ANSI colour codes."""
+    """Post-process: wrap node interiors/borders in ANSI colour codes.
+
+    ``color`` sets the text foreground, ``fill`` the background, and
+    ``border-color`` the box frame (all three accept named or ``#RRGGBB``
+    values). Colour codes are injected around the relevant characters so
+    the box grid stays valid.
+    """
     for name, (x0, y0, w, h) in pos.items():
         node = graph.nodes[name]
-        fg = _ansi_fg(node.attrs.get("color", ""))
-        bg = _ansi_bg(node.attrs.get("fill", ""))
-        codes = [c for c in (bg, fg) if c]
-        if not codes:
-            continue
-        start = "\x1b[" + ";".join(codes) + "m"
-        end = "\x1b[0m"
-        for r in range(1, h - 1):
-            row = cv.cells[y0 + r]
-            row[x0] = start + row[x0]
-            row[x0 + w - 1] += end
+        scheme = node.attrs.get("scheme") or node.attrs.get("colorscheme")
+        # label text colour (foreground) + node fill (background)
+        fg_codes = [
+            c
+            for c in (
+                _bg_sgr(node.attrs.get("fill", ""), scheme),
+                _fg_sgr(node.attrs.get("color", ""), scheme),
+            )
+            if c
+        ]
+        if fg_codes:
+            start = "\x1b[" + ";".join(fg_codes) + "m"
+            end = "\x1b[0m"
+            for r in range(1, h - 1):
+                row = cv.cells[y0 + r]
+                row[x0] = start + row[x0]
+                row[x0 + w - 1] += end
+        # border frame colour: one escape around the whole top/bottom row.
+        bd = _fg_sgr(
+            node.attrs.get("border-color", node.attrs.get("bordercolor", "")),
+            scheme,
+        )
+        if bd:
+            bd_start = "\x1b[" + bd + "m"
+            end = "\x1b[0m"
+            for r in (y0, y0 + h - 1):
+                row = cv.cells[r]
+                row[x0] = bd_start + row[x0]
+                row[x0 + w - 1] += end
 
 
 def _box(node: Node, box: _BoxChars) -> list[str]:

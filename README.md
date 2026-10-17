@@ -49,8 +49,11 @@ Actively-developed port. Currently implemented:
   to fit)
 - **Two output charsets**: Unicode box-drawing by default
   (`┌──┐ ──▶ ══ ║ ·`), plain ASCII via `--ascii`
-- **Colours**: `fill`/`color` attributes map to ANSI codes (on by default,
-  `--no-color` / `--color auto` to control)
+- **Colours** (on by default; `--no-color` / `--color auto` to control):
+  `fill` (background) and `color` (foreground) for the label, `border-color`
+  for the frame, and a ColourBrewer palette via `color: <n>; scheme: <name>`.
+  Values accept named colours, `#RGB` / `#RRGGBB` true-colour, or a palette
+  index (e.g. `color: 3; scheme: blues5`).
 
 Limitations: labels are clipped to the free space beside an edge; very dense
 graphs may need manual attribute tuning. The heavier automatic layout engine

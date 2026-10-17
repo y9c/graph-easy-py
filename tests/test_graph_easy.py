@@ -256,6 +256,44 @@ def test_color_attrs_disabled_by_default():
     assert "\x1b[" not in render(g)
 
 
+def test_hex_truecolor_foreground_and_background():
+    g = parse_graph("[ A ] { color: #ff0000; fill: #0000ff; } --> [ B ]")
+    out = render(g, color=True)
+    assert "38;2;255;0;0" in out  # red text via true-colour
+    assert "48;2;0;0;255" in out  # blue background via true-colour
+
+
+def test_hex_shorthand_triplet():
+    # #RGB shorthand expands to #RRGGBB
+    assert "38;2;170;187;204" in render(parse_graph("[ A ] { color: #abc; } --> [ B ]"), color=True)
+
+
+def test_extended_named_colours():
+    out = render(parse_graph("[ A ] { color: deeppink; fill: lavender; } --> [ B ]"), color=True)
+    assert "38;2;255;20;147" in out  # deeppink
+    assert "48;2;230;230;250" in out  # lavender
+
+
+def test_colourbrewer_scheme_index():
+    # color: <n>; scheme: <name> resolves against the palette
+    out = render(parse_graph("[ A ] { color: 3; scheme: blues5; } --> [ B ]"), color=True)
+    assert "38;2;107;174;214" in out  # blues5[3]
+    out2 = render(parse_graph("[ A ] { fill: 2; scheme: set1; } --> [ B ]"), color=True)
+    assert "48;2;55;126;184" in out2  # set1[2]
+
+
+def test_border_color_truecolour():
+    out = render(parse_graph("[ A ] { border-color: #00ff00; } --> [ B ]"), color=True)
+    assert "38;2;0;255;0" in out
+
+
+def test_unknown_colour_survives_render():
+    # an unrecognised colour must not crash; it just renders uncoloured
+    out = render(parse_graph("[ A ] { color: notacolour; } --> [ B ]"), color=True)
+    assert "notacolour" not in out
+    assert "│ A │" in out
+
+
 # ---- routing regressions ----------------------------------------------------
 
 
