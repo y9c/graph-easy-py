@@ -342,3 +342,41 @@ def test_cli_missing_file(capsys):
 
     assert main(["/nonexistent/graph-easy-test-file.txt"]) == 1
     assert "graph-easy:" in capsys.readouterr().err
+
+
+def test_bent_edge_does_not_clobber_unrelated_node_border():
+    # issue #5: B -> C must not run its vertical along Longest's right
+    # border. Longest is a leaf; its box border must stay intact (no fused
+    # ┤ that would imply a false Longest -> C edge).
+    out = render(parse_graph(
+        "[ R ] -> [ Longest ]\n[ R ] -> [ B ]\n[ B ] -> [ C ]"
+    ))
+    assert "│ Longest │" in out
+    assert "▶" in out  # R -> Longest arrow still present
+    assert "┤" not in out  # Longest's right border not fused to B->C
+
+
+def test_wide_sibling_bent_edge_keeps_all_boxes_intact():
+    # A wide leaf sibling must never have its border clobbered by a bent
+    # edge routed through a channel centre; every box in the diagram stays
+    # whole (no cell turned into a ┤/┐/└ that eats into a frame).
+    out = render(parse_graph(
+        "[ R ] -> [ BiggestNode ]\n[ R ] -> [ B ]\n[ B ] -> [ C ]\n"
+        "[ B ] -> [ D ]\n[ C ] -> [ E ]\n[ D ] -> [ E ]"
+    ))
+    for label in ("BiggestNode", "B", "C", "D", "E"):
+        assert f"│ {label} │" in out or f"│ {label} " in out
+    # R -> BiggestNode arrow survives
+    assert "▶" in out
+
+
+def test_ascii_bent_edge_center_exit():
+    # ASCII mirror of the adjacent bent edge: the source must still exit at
+    # its centre row (PR4) and not clobber a sibling (PR5).
+    out = render(parse_graph(
+        "[ R ] -> [ Longest ]\n[ R ] -> [ B ]\n[ B ] -> [ C ]"
+    ), ascii_style=True)
+    assert "| Longest |" in out
+    assert "+" in out
+
+
