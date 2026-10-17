@@ -416,6 +416,16 @@ def test_attr_label_is_used():
     assert "ret" in out
 
 
+def test_edge_label_pos_below():
+    # label-pos: below places the label on the line below the edge
+    out = render(parse_graph("[ A ] -- { label-pos: below; label: x; } --> [ B ]"))
+    lines = out.splitlines()
+    # the label should not be on the same row as the edge line / not above it
+    edge_row = next(i for i, line in enumerate(lines) if "▶" in line)
+    label_row = next(i for i, line in enumerate(lines) if "x" in line)
+    assert label_row == edge_row + 1
+
+
 # ---- CLI ---------------------------------------------------------------------
 
 

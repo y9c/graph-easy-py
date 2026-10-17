@@ -878,6 +878,12 @@ def _get_arrows(cs: _CharSet, e: Edge) -> tuple[str, str, str]:
     return (cs.ar, cs.al, cs.ar_up)
 
 
+def _label_offset(e: Edge) -> int:
+    """Row offset for an edge label: -1 above the line (default), +1 below."""
+    pos = (e.attrs.get("label-pos") or "above").strip().lower()
+    return 1 if pos == "below" else -1
+
+
 def _draw_straight(
     cv: _Canvas,
     e: Edge,
@@ -908,7 +914,8 @@ def _draw_straight(
     if arrow_right:
         cv.set(x2, y, ar)
     if e.label:
-        ly = y - 1 if y > 0 else y + 1
+        off = _label_offset(e)
+        ly = y + off if 0 <= y + off < cv.height else y - off
         cv.put_label(label_x0, label_x1, ly, e.label)
 
 
