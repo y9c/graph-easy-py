@@ -43,24 +43,22 @@ Actively-developed port. Currently implemented:
   back edges (cycles) and self-loops all render without clobbering boxes
   (long edges are routed through detour rows); independent components
   stack as separate diagrams
-- **Edge line styles** (faithful to upstream `Parser::_edge_style`):
-  `--` solid, `..` dotted, `==` double, `~~` wave, `##` bold, `.-`/`..-` dot-dash
-- **Edge labels** float in the box-free region next to the line (truncated
-  to fit)
-- **Two output charsets**: Unicode box-drawing by default
-  (`┌──┐ ──▶ ══ ║ ·`), plain ASCII via `--ascii`
-- **Colours** (on by default; `--no-color` / `--color auto` to control):
-  `fill` (background) and `color` (foreground) for the label, `border-color`
-  for the frame, and a ColourBrewer palette via `color: <n>; scheme: <name>`.
-  Values accept named colours, `#RGB` / `#RRGGBB` true-colour, or a palette
-  index (e.g. `color: 3; scheme: blues5`).
-- **Node shapes**: `normal`/`box` (rectangle), `rounded`/`ellipse`/`circle`/
-  `oval`, `diamond`, and `hexagon`, set via `shape: <name>`.
-- **Graphviz export**: `--dot` (or `--format dot`) emits Graphviz DOT;
-  `--format svg|png` renders via the `dot` binary when available.
+- **Edge line styles**: `--` solid, `..` dotted, `==` double, `~~` wave,
+  `##` bold, `.-`/`..-` dot-dash
+- **Edge labels** float next to the line (truncated to fit)
+- **Two output charsets**: Unicode box-drawing by default, plain ASCII via
+  `--ascii`
+- **Colours**: `fill`/`color`, `border-color`, and a ColourBrewer palette
+  via `color: <n>; scheme: <name>`; accepts named colours, `#RGB`/`#RRGGBB`
+  true-colour, or a palette index
+- **Node shapes**: `normal`/`box`, `rounded`/`ellipse`/`circle`/`oval`,
+  `diamond`, `hexagon`
+- **Edge arrows**: `arrow-style: plain|open|line` (ASCII heads) vs filled
+- **Text style**: `text-style: bold|italic|underline|strike`
+- **Graphviz export**: `--dot` emits DOT; `--format svg|png` uses `dot`
 
-Limitations: labels are clipped to the free space beside an edge; very dense
-graphs may need manual attribute tuning. The heavier automatic layout engine
+Limitations: labels clip to free space beside an edge; very dense graphs may
+need manual attribute tuning. The heavier layout engine
 (`Graph::Easy::Layout` grid solver) is a follow-up milestone.
 
 ## Usage
