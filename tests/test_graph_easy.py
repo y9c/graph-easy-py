@@ -14,6 +14,7 @@ from graph_easy.render import render
 
 # ---- box geometry ----------------------------------------------------------
 
+
 def test_box_dimensions():
     g = parse_graph("[ abc ]")
     n = g.nodes["abc"]
@@ -39,6 +40,7 @@ def test_padding_is_respected():
 
 # ---- parsing ---------------------------------------------------------------
 
+
 def test_parses_simple_chain():
     g = parse_graph("[ A ] --> [ B ] --> [ C ]")
     assert list(g.nodes) == ["A", "B", "C"]
@@ -63,6 +65,7 @@ def test_comments_ignored():
 
 
 # ---- rendering --------------------------------------------------------------
+
 
 def test_render_smoke_no_crash():
     out = render(parse_graph("[ hello ] --> [ world ]"), ascii_style=True)
@@ -90,10 +93,7 @@ def test_render_unicode_merge_junction_points_toward_vertical_edge():
     out = render(parse_graph("[ A ] --> [ C ]\n[ B ] --> [ C ]"))
     lines = out.splitlines()
     junctions = [
-        (x, y, ch)
-        for y, line in enumerate(lines)
-        for x, ch in enumerate(line)
-        if ch in "┬┴"
+        (x, y, ch) for y, line in enumerate(lines) for x, ch in enumerate(line) if ch in "┬┴"
     ]
     assert len(junctions) == 1
     x, y, ch = junctions[0]
@@ -123,6 +123,7 @@ def test_render_empty_graph():
 
 
 # ---- shapes & attributes ----------------------------------------------------
+
 
 def test_node_attribute_block_applies_shape():
     g = parse_graph("[ Start ] { shape: diamond; } --> [ A ]")
@@ -192,6 +193,7 @@ def test_disjoint_groups_render_separately():
 
 # ---- layout: fan-out / parallel branches ------------------------------------
 
+
 def test_fan_out_keeps_all_edges():
     g = parse_graph("[ S ] --> [ A ]\n[ S ] --> [ B ]\n[ S ] --> [ C ]\n")
     assert len(g.edges) == 3
@@ -208,10 +210,7 @@ def test_diamond_renders_all_four_edges():
 
 
 def test_parallel_paths_merge_cleanly():
-    g = parse_graph(
-        "[ S ] --> [ P1 ]\n[ S ] --> [ P2 ]\n"
-        "[ P1 ] --> [ T ]\n[ P2 ] --> [ T ]\n"
-    )
+    g = parse_graph("[ S ] --> [ P1 ]\n[ S ] --> [ P2 ]\n[ P1 ] --> [ T ]\n[ P2 ] --> [ T ]\n")
     out = render(g)
     assert "P1" in out and "P2" in out and "T" in out
 
@@ -258,6 +257,7 @@ def test_color_attrs_disabled_by_default():
 
 
 # ---- routing regressions ----------------------------------------------------
+
 
 @pytest.mark.parametrize("ascii_style", [False, True])
 @pytest.mark.parametrize(
@@ -345,6 +345,7 @@ def test_attr_label_is_used():
 
 # ---- CLI ---------------------------------------------------------------------
 
+
 def test_cli_main(tmp_path, capsys):
     from graph_easy.cli import main
 
@@ -366,9 +367,7 @@ def test_bent_edge_does_not_clobber_unrelated_node_border():
     # issue #5: B -> C must not run its vertical along Longest's right
     # border. Longest is a leaf; its box border must stay intact (no fused
     # ┤ that would imply a false Longest -> C edge).
-    out = render(parse_graph(
-        "[ R ] -> [ Longest ]\n[ R ] -> [ B ]\n[ B ] -> [ C ]"
-    ))
+    out = render(parse_graph("[ R ] -> [ Longest ]\n[ R ] -> [ B ]\n[ B ] -> [ C ]"))
     assert "│ Longest │" in out
     assert "▶" in out  # R -> Longest arrow still present
     assert "┤" not in out  # Longest's right border not fused to B->C
@@ -378,10 +377,12 @@ def test_wide_sibling_bent_edge_keeps_all_boxes_intact():
     # A wide leaf sibling must never have its border clobbered by a bent
     # edge routed through a channel centre; every box in the diagram stays
     # whole (no cell turned into a ┤/┐/└ that eats into a frame).
-    out = render(parse_graph(
-        "[ R ] -> [ BiggestNode ]\n[ R ] -> [ B ]\n[ B ] -> [ C ]\n"
-        "[ B ] -> [ D ]\n[ C ] -> [ E ]\n[ D ] -> [ E ]"
-    ))
+    out = render(
+        parse_graph(
+            "[ R ] -> [ BiggestNode ]\n[ R ] -> [ B ]\n[ B ] -> [ C ]\n"
+            "[ B ] -> [ D ]\n[ C ] -> [ E ]\n[ D ] -> [ E ]"
+        )
+    )
     for label in ("BiggestNode", "B", "C", "D", "E"):
         assert f"│ {label} │" in out or f"│ {label} " in out
     # R -> BiggestNode arrow survives
@@ -391,10 +392,56 @@ def test_wide_sibling_bent_edge_keeps_all_boxes_intact():
 def test_ascii_bent_edge_center_exit():
     # ASCII mirror of the adjacent bent edge: the source must still exit at
     # its centre row (PR4) and not clobber a sibling (PR5).
-    out = render(parse_graph(
-        "[ R ] -> [ Longest ]\n[ R ] -> [ B ]\n[ B ] -> [ C ]"
-    ), ascii_style=True)
+    out = render(
+        parse_graph("[ R ] -> [ Longest ]\n[ R ] -> [ B ]\n[ B ] -> [ C ]"), ascii_style=True
+    )
     assert "| Longest |" in out
     assert "+" in out
 
 
+def _display_width(s: str) -> int:
+    """Terminal cells a string occupies (CJK wide chars = 2)."""
+    import unicodedata
+
+    total = 0
+    for ch in s:
+        total += 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+    return total
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "[ 中文 ] -> [ B ]",
+        "[ 北京 ] -> [ 上海 ] -> [ 广州 ]",
+        "[ A ] -> [ 北京 ]\n[ A ] -> [ 东京 ]\n[ 北京 ] -> [ C ]\n[ 东京 ] -> [ C ]",
+        "[ 中文 ] -> [ 东京 ]",
+        # Japanese hiragana / katakana / kanji and mixed CJK+Latin labels all
+        # render at their true display width so box borders stay aligned.
+        "[ とうきょう ] -> [ おおさか ] -> [ きょうと ]",
+        "[ 東京 ] -> [ 大阪 ] -> [ 京都 ]",
+        "[ 中国 ] -> [ Tokyo ] -> [ 大阪 ]",
+        "[ ｶﾀｶﾅ ] -> [ ひらがな ]",
+    ],
+)
+def test_wide_char_boxes_align_by_display_width(text):
+    # CJK/emoji labels consume two display cells each; the box border rows
+    # must match the interior rows in *display* width (not code points) so
+    # the frame stays rectangular in a monospaced terminal. A top border and
+    # its matching bottom border must have equal display width.
+    out = render(parse_graph(text))
+    lines = out.splitlines()
+    for i, line in enumerate(lines[:-2]):
+        if line.lstrip().startswith("\u250c") and lines[i + 2].lstrip().startswith("\u2514"):
+            assert _display_width(line) == _display_width(lines[i + 2])
+
+
+def test_wide_char_kernel_widths():
+    # node geometry: inner_width / width must count display cells, not chars
+    from graph_easy.node import Node
+
+    assert Node(label="中文").inner_width() == 4  # 中+文 each two cells
+    assert Node(label="中文").width() == 2 + 2 * 1 + 4
+    assert Node(label="abc").inner_width() == 3
+    assert Node(label="とうきょう").inner_width() == 10  # 5 hiragana * 2 cells
+    assert Node(label="東京").inner_width() == 4

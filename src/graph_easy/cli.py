@@ -20,9 +20,7 @@ def main(argv: list[str] | None = None) -> int:
         nargs="?",
         help="read DSL from FILE instead of stdin ('-' = stdin)",
     )
-    ap.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
-    )
+    ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     ap.add_argument(
         "--ascii",
         action="store_true",

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from graph_easy._width import display_width
+
 
 @dataclass
 class Node:
@@ -35,11 +37,11 @@ class Node:
         return src.replace(r"\n", "\n").split("\n")
 
     def inner_width(self) -> int:
-        """Width of the label area in cells (widest line, >= 1)."""
+        """Width of the label area in *display cells* (widest line, >= 1)."""
         lines = self.label_lines()
         if not lines:
             return 1
-        return max(len(line) for line in lines) or 1
+        return max(display_width(line) for line in lines) or 1
 
     def inner_height(self) -> int:
         return max(len(self.label_lines()), 1)

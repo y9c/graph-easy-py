@@ -22,11 +22,18 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 
+from graph_easy._width import display_width, truncate_display
 from graph_easy.node import Node
 from graph_easy.parser import Edge, Graph
 
 _CHANNEL = 5
 _STYLE_DEFAULT = "solid"
+
+# Sentinel stored in the *second* display column of a wide (CJK/emoji)
+# character. It lets the grid be indexed by display column while the glyph
+# lives only at the first column; ``text()`` drops it so the wide char still
+# renders at its true width but occupies two grid columns.
+_WIDE_CONT = "\x00"
 
 # Direction bits used to merge line segments into junction glyphs.
 L, R, U, D = 1, 2, 4, 8
@@ -85,18 +92,42 @@ _JOIN_ASCII = {
 
 # ANSI colour table — the 16 standard terminal colours plus common names.
 _ANSI_FG: dict[str, str] = {
-    "black": "30", "red": "31", "green": "32", "yellow": "33",
-    "blue": "34", "magenta": "35", "cyan": "36", "white": "37",
-    "brightred": "91", "brightgreen": "92", "brightyellow": "93",
-    "brightblue": "94", "brightmagenta": "95", "brightcyan": "96",
-    "grey": "90", "gray": "90", "brightwhite": "97",
+    "black": "30",
+    "red": "31",
+    "green": "32",
+    "yellow": "33",
+    "blue": "34",
+    "magenta": "35",
+    "cyan": "36",
+    "white": "37",
+    "brightred": "91",
+    "brightgreen": "92",
+    "brightyellow": "93",
+    "brightblue": "94",
+    "brightmagenta": "95",
+    "brightcyan": "96",
+    "grey": "90",
+    "gray": "90",
+    "brightwhite": "97",
 }
 _ANSI_BG: dict[str, str] = {
-    "black": "40", "red": "41", "green": "42", "yellow": "43",
-    "blue": "44", "magenta": "45", "cyan": "46", "white": "47",
-    "brightred": "101", "brightgreen": "102", "brightyellow": "103",
-    "brightblue": "104", "brightmagenta": "105", "brightcyan": "106",
-    "grey": "100", "gray": "100", "brightwhite": "107",
+    "black": "40",
+    "red": "41",
+    "green": "42",
+    "yellow": "43",
+    "blue": "44",
+    "magenta": "45",
+    "cyan": "46",
+    "white": "47",
+    "brightred": "101",
+    "brightgreen": "102",
+    "brightyellow": "103",
+    "brightblue": "104",
+    "brightmagenta": "105",
+    "brightcyan": "106",
+    "grey": "100",
+    "gray": "100",
+    "brightwhite": "107",
 }
 
 
@@ -154,12 +185,23 @@ class _Canvas:
 
     def get(self, x: int, y: int) -> str:
         if 0 <= y < self.height and 0 <= x < self.width:
-            return self.cells[y][x]
+            ch = self.cells[y][x]
+            return "" if ch == _WIDE_CONT else ch
         return ""
 
     def set(self, x: int, y: int, ch: str) -> None:
-        if 0 <= y < self.height and 0 <= x < self.width:
-            self.cells[y][x] = ch
+        """Place ``ch`` at (x, y), claiming its full display width.
+
+        A wide (CJK/emoji) character occupies two display columns, so the
+        nested column is marked with ``_WIDE_CONT`` to reserve it and keep
+        later writes from clobbering the continuation column.
+        """
+        if not (0 <= y < self.height and 0 <= x < self.width):
+            return
+        self.cells[y][x] = ch
+        w = display_width(ch)
+        if w == 2 and 0 <= y < self.height and x + 1 < self.width:
+            self.cells[y][x + 1] = _WIDE_CONT
 
     def merge(self, x: int, y: int, ch: str, mask: int, cs: _CharSet) -> None:
         """Place ``ch`` (contributing directions ``mask``) at (x, y).
@@ -171,10 +213,13 @@ class _Canvas:
         if not (0 <= y < self.height and 0 <= x < self.width):
             return
         cur = self.cells[y][x]
-        if cur == " ":
+        if cur == " " or cur == _WIDE_CONT:
             # Empty cell: use the glyph for this segment's own mask, so a
-            # corner mask yields a corner glyph, not a bare line char.
-            self.cells[y][x] = cs.join.get(mask, ch)
+            # corner mask yields a corner glyph, not a bare line char. A
+            # wide-char continuation column is left untouched so a line
+            # never splits a CJK glyph in half.
+            if cur == " ":
+                self.cells[y][x] = cs.join.get(mask, ch)
             return
 
         # A corner joining an existing line must add its vertical connection
@@ -214,11 +259,14 @@ class _Canvas:
         width = x1 - x0 + 1
         if width < 1:
             return
-        if len(text) > width:
-            text = text[:width]
-        start = max(x0, (x0 + x1) // 2 - len(text) // 2)
-        for i, ch in enumerate(text):
-            self.set(start + i, y, ch)
+        tw = display_width(text)
+        if tw > width:
+            text = truncate_display(text, width)
+            tw = display_width(text)
+        start = max(x0, (x0 + x1) // 2 - tw // 2)
+        for ch in text:
+            self.set(start, y, ch)
+            start += display_width(ch)
 
     def grow(self, width: int, height: int) -> None:
         """Extend right/down, keeping existing content."""
@@ -234,7 +282,11 @@ class _Canvas:
             self.height = height_only
 
     def text(self) -> str:
-        return "\n".join("".join(row).rstrip() for row in self.cells)
+        lines: list[str] = []
+        for row in self.cells:
+            out = "".join(ch for ch in row if ch != _WIDE_CONT)
+            lines.append(out.rstrip())
+        return "\n".join(lines)
 
 
 def _apply_color(cv: _Canvas, pos: dict, graph: Graph) -> None:
@@ -283,7 +335,7 @@ def _box(node: Node, box: _BoxChars) -> list[str]:
     for _ in range(pad_y):
         rows.append(v2 + " " * (w - 2) + v2)
     for line in lines:
-        right = max(inner_w - len(line), 0)
+        right = max(inner_w - display_width(line), 0)
         rows.append(v2 + " " * pad_x + line + " " * (pad_x + right) + v2)
     for _ in range(pad_y):
         rows.append(v2 + " " * (w - 2) + v2)
@@ -312,7 +364,7 @@ def _box_diamond(node: Node, border: str, box: _BoxChars) -> list[str]:
             pad = abs(half - li)
             text = lines[li] if li < len(lines) else ""
             left_pad = " " * (pad + 1)
-            right_pad = " " * (max(inner_w - len(text), 0) + pad + 1)
+            right_pad = " " * (max(inner_w - display_width(text), 0) + pad + 1)
             row = left_pad + vch + text + right_pad + vch
         rows.append(row.ljust(width))
     return rows
@@ -459,9 +511,7 @@ def _plan_routes(
             if (
                 cx_s > sx
                 and cv.row_clear(sx, cx_s - 1, sy_mid)
-                and cv.col_clear(
-                    min(sy_mid, ty_mid) + 1, max(sy_mid, ty_mid) - 1, cx_s
-                )
+                and cv.col_clear(min(sy_mid, ty_mid) + 1, max(sy_mid, ty_mid) - 1, cx_s)
                 and cv.row_clear(cx_s + 1, tx - 1, ty_mid)
             ):
                 routes.append(_Route(e, "adjacentz", cx=cx_s))
@@ -566,9 +616,7 @@ def _draw_z(
     """
     if y1 == y2:
         if back:
-            _draw_straight(
-                cv, e, cs, tx_border, sx - 1, y1, label_x0, label_x1, back=True
-            )
+            _draw_straight(cv, e, cs, tx_border, sx - 1, y1, label_x0, label_x1, back=True)
         else:
             _draw_straight(cv, e, cs, sx, tx_border - 1, y1, label_x0, label_x1)
         return
@@ -708,9 +756,7 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
     bands: list[str] = []
     for comp in _components(graph):
         layers = _barycenter_order(_layers(comp, graph), graph)
-        layer_boxes = [
-            [_box(graph.nodes[n], cs.box) for n in layer] for layer in layers
-        ]
+        layer_boxes = [[_box(graph.nodes[n], cs.box) for n in layer] for layer in layers]
 
         # Self-loop nodes reserve one extra gap row below their box.
         selfloop: set[str] = set()
@@ -718,12 +764,9 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
             if e.source == e.target and e.source in comp:
                 selfloop.add(e.source)
 
-        col_w = [
-            max(max(len(row) for row in b) for b in boxes) for boxes in layer_boxes
-        ]
+        col_w = [max(max(display_width(row) for row in b) for b in boxes) for boxes in layer_boxes]
         col_h = [
-            sum(len(b) + (1 if n in selfloop else 0)
-                for b, n in zip(boxes, layers[c], strict=True))
+            sum(len(b) + (1 if n in selfloop else 0) for b, n in zip(boxes, layers[c], strict=True))
             + (len(boxes) - 1)
             for c, boxes in enumerate(layer_boxes)
         ]
@@ -753,15 +796,15 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
             for i, b in enumerate(boxes):
                 x0, y0 = colx[c], y_offs[c][i] + pad
                 for r, row in enumerate(b):
-                    for cc, ch in enumerate(row):
-                        cv.cells[y0 + r][x0 + cc] = ch
-                pos[layers[c][i]] = (x0, y0, len(b[0]), len(b))
+                    cc = 0
+                    for ch in row:
+                        cv.set(x0 + cc, y0 + r, ch)
+                        cc += display_width(ch)
+                pos[layers[c][i]] = (x0, y0, display_width(b[0]), len(b))
 
         edges = _comp_edges(comp, graph)
         layer_of = {n: c for c, layer in enumerate(layers) for n in layer}
-        routes = _plan_routes(
-            cv, pos, edges, layer_of, len(layers), colx, col_w, pad, base_w
-        )
+        routes = _plan_routes(cv, pos, edges, layer_of, len(layers), colx, col_w, pad, base_w)
 
         # Grow the canvas for detour rows and wide self loops.
         width = base_w
@@ -783,9 +826,7 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
             if route.kind == "selfloop":
                 _draw_selfloop(cv, e, cs, pos, layer_of, col_w, colx)
             elif route.kind == "straight":
-                _draw_straight(
-                    cv, e, cs, sx, tx - 1, sy_mid, sx, min(tx - 1, colx[s + 1] - 1)
-                )
+                _draw_straight(cv, e, cs, sx, tx - 1, sy_mid, sx, min(tx - 1, colx[s + 1] - 1))
             elif route.kind == "backstraight":
                 _draw_straight(
                     cv,
@@ -801,24 +842,48 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
             elif route.kind == "adjacentz":
                 cx = route.cx if route.cx is not None else colx[s] + col_w[s] + _CHANNEL // 2
                 _draw_z(
-                    cv, e, cs,
-                    sx=sx, y1=sy_mid, cx=cx, tx_border=tx, y2=ty_mid,
-                    label_x0=sx, label_x1=colx[s + 1] - 1, label_y=sy_mid - 1,
+                    cv,
+                    e,
+                    cs,
+                    sx=sx,
+                    y1=sy_mid,
+                    cx=cx,
+                    tx_border=tx,
+                    y2=ty_mid,
+                    label_x0=sx,
+                    label_x1=colx[s + 1] - 1,
+                    label_y=sy_mid - 1,
                 )
             elif route.kind == "spanz":
                 cx_s = colx[s] + col_w[s] + _CHANNEL // 2
                 _draw_z(
-                    cv, e, cs,
-                    sx=sx, y1=sy_exit, cx=cx_s, tx_border=tx, y2=ty_mid,
-                    label_x0=sx, label_x1=colx[s + 1] - 1, label_y=sy_exit - 1,
+                    cv,
+                    e,
+                    cs,
+                    sx=sx,
+                    y1=sy_exit,
+                    cx=cx_s,
+                    tx_border=tx,
+                    y2=ty_mid,
+                    label_x0=sx,
+                    label_x1=colx[s + 1] - 1,
+                    label_y=sy_exit - 1,
                 )
             elif route.kind == "backz":
                 cx_s = colx[s] + col_w[s] + _CHANNEL // 2
                 _draw_z(
-                    cv, e, cs,
-                    sx=sx, y1=sy_exit, cx=cx_s, tx_border=tx0 + tw, y2=ty_mid,
-                    label_x0=tx0 + tw, label_x1=colx[t + 1] - 1,
-                    label_y=ty_mid - 1, back=True,
+                    cv,
+                    e,
+                    cs,
+                    sx=sx,
+                    y1=sy_exit,
+                    cx=cx_s,
+                    tx_border=tx0 + tw,
+                    y2=ty_mid,
+                    label_x0=tx0 + tw,
+                    label_x1=colx[t + 1] - 1,
+                    label_y=ty_mid - 1,
+                    back=True,
                 )
             else:
                 _draw_detour(cv, route, cs, pos, s, t, colx, col_w)
@@ -866,9 +931,7 @@ def _draw_groups(
         y0, y1 = max(min(ys) - 1, 0), min(max(ye) + 1, cv.height - 1)
         return x0, y0, x1, y1
 
-    def overlap(
-        a: tuple[int, int, int, int], b: tuple[int, int, int, int]
-    ) -> bool:
+    def overlap(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
         return not (a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1])
 
     frames: list[_GroupFrame] = []

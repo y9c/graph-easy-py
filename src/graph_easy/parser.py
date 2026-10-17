@@ -28,12 +28,12 @@ from graph_easy.node import Node
 _TOK = re.compile(
     r"\s*"
     r"(?:"
-    r"(\[[^\]]*\])"          # 1: bracketed node
-    r"|(<[=.\-~#]*[=.\-~#]>?)"   # 2: edge with leading '<'
-    r"|([=.\-~#]*[=.\-~#]>?)"    # 3: edge without '<'
-    r"|(\{[^{}]*\})"         # 4: attribute block { k: v; }
-    r"|([()])"               # 5: group open/close
-    r"|([^\s]+)"             # 6: bare word
+    r"(\[[^\]]*\])"  # 1: bracketed node
+    r"|(<[=.\-~#]*[=.\-~#]>?)"  # 2: edge with leading '<'
+    r"|([=.\-~#]*[=.\-~#]>?)"  # 3: edge without '<'
+    r"|(\{[^{}]*\})"  # 4: attribute block { k: v; }
+    r"|([()])"  # 5: group open/close
+    r"|([^\s]+)"  # 6: bare word
     r")"
 )
 
