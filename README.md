@@ -54,6 +54,8 @@ Actively-developed port. Currently implemented:
   for the frame, and a ColourBrewer palette via `color: <n>; scheme: <name>`.
   Values accept named colours, `#RGB` / `#RRGGBB` true-colour, or a palette
   index (e.g. `color: 3; scheme: blues5`).
+- **Node shapes**: `normal`/`box` (rectangle), `rounded`/`ellipse`/`circle`/
+  `oval`, `diamond`, and `hexagon`, set via `shape: <name>`.
 
 Limitations: labels are clipped to the free space beside an edge; very dense
 graphs may need manual attribute tuning. The heavier automatic layout engine

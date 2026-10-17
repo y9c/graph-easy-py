@@ -143,6 +143,24 @@ def test_double_and_rounded_borders():
     assert "╭" in out  # rounded corner
 
 
+def test_hexagon_shape_renders():
+    out = render(parse_graph("[ Start ] { shape: hexagon; } --> [ End ]"))
+    assert "/" in out and "\\" in out  # slanted hexagon top/bottom
+    assert "Start" in out
+
+
+def test_circle_and_oval_shapes_render():
+    out = render(parse_graph("[ A ] { shape: circle; } --> [ B ]"))
+    assert "╭" in out and "╰" in out  # rounded/elliptical frame
+    out2 = render(parse_graph("[ A ] { shape: oval; } --> [ B ]"))
+    assert "╭" in out2
+
+
+def test_box_shape_is_plain_rectangle():
+    out = render(parse_graph("[ A ] { shape: box; } --> [ B ]"))
+    assert "┌" in out and "└" in out  # normal rectangle
+
+
 def test_group_parses_and_frames_nodes():
     g = parse_graph("( Pipeline [ Input ] --> [ Output ] )")
     assert g.nodes["Input"].attrs.get("group") == "Pipeline"

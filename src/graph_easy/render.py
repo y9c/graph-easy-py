@@ -587,6 +587,8 @@ def _box(node: Node, box: _BoxChars) -> list[str]:
     border = node.attrs.get("border", "solid")
     if shape == "diamond":
         return _box_diamond(node, border, box)
+    if shape == "hexagon":
+        return _box_hexagon(node, border, box)
     pad_x = node.padding_x
     pad_y = node.padding_y
     inner_w = node.inner_width()
@@ -598,7 +600,7 @@ def _box(node: Node, box: _BoxChars) -> list[str]:
         h2, v2 = "╌", "╎"
     else:
         h2, v2 = h, v
-    if shape in ("ellipse", "rounded"):
+    if shape in ("ellipse", "rounded", "circle", "oval"):
         tl, tr, bl, br = "╭", "╮", "╰", "╯"
     border_t = tl + h2 * (w - 2) + tr
     rows: list[str] = [border_t]
@@ -636,6 +638,30 @@ def _box_diamond(node: Node, border: str, box: _BoxChars) -> list[str]:
             left_pad = " " * (pad + 1)
             right_pad = " " * (max(inner_w - display_width(text), 0) + pad + 1)
             row = left_pad + vch + text + right_pad + vch
+        rows.append(row.ljust(width))
+    return rows
+
+
+def _box_hexagon(node: Node, border: str, box: _BoxChars) -> list[str]:
+    """Hexagon node — slanted top/bottom edges with a horizontal label band."""
+    _, _, _, _, v, h = box
+    hch = "═" if border == "double" else h
+    vch = "║" if border == "double" else v
+    lines = node.label_lines()
+    inner_w = node.inner_width()
+    width = inner_w + 4
+    total_rows = len(lines) + 2
+    rows: list[str] = []
+    for r in range(total_rows):
+        if r == 0:
+            row = " " + "/" + hch * max(inner_w, 2) + "\\"
+        elif r == total_rows - 1:
+            row = " " + "\\" + hch * max(inner_w, 2) + "/"
+        else:
+            li = r - 1
+            text = lines[li] if li < len(lines) else ""
+            right = max(inner_w - display_width(text), 0)
+            row = " " + vch + " " + text + " " * right + " " + vch
         rows.append(row.ljust(width))
     return rows
 
