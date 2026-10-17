@@ -83,6 +83,22 @@ def test_render_unicode_default():
     assert "─" in out
 
 
+def test_render_unicode_merge_junction_points_toward_vertical_edge():
+    """A branch entering from below must join with a downward-facing tee."""
+    out = render(parse_graph("[ A ] --> [ C ]\n[ B ] --> [ C ]"))
+    lines = out.splitlines()
+    junctions = [
+        (x, y, ch)
+        for y, line in enumerate(lines)
+        for x, ch in enumerate(line)
+        if ch in "┬┴"
+    ]
+    assert len(junctions) == 1
+    x, y, ch = junctions[0]
+    assert lines[y + 1][x] == "│"
+    assert ch == "┬"
+
+
 def test_undirected_edge_renders_as_double_dash():
     g = parse_graph("[ A ] -- [ B ]")
     assert not g.edges[0].directed_to_target
@@ -186,9 +202,9 @@ def test_edge_corners_use_box_chars():
     out = render(parse_graph("[ A ] --> [ B ]\n[ A ] --> [ C ]"))
     assert "┐" in out and "└" in out
     # an upward merge: B's vertical arm joins the A->D through-line from
-    # below, so the junction is a downward tee (┴), not a broken edge
+    # below, so the junction is a downward tee (┬), not a broken edge
     out2 = render(parse_graph("[ A ] --> [ D ]\n[ B ] --> [ D ]"))
-    assert "┘" in out2 and "┴" in out2
+    assert "┘" in out2 and "┬" in out2
     # ASCII corners fall back to "+"
     out3 = render(parse_graph("[ A ] --> [ B ]\n[ A ] --> [ C ]"), ascii_style=True)
     assert "\u250c" not in out3 and "+" in out3
@@ -238,7 +254,7 @@ def test_cycle_back_edge_renders():
     assert out.count("┌───┐") == 3
     # every box intact, back edge routed through a detour row below
     assert "│ A │" in out and "│ B │" in out and "│ C │" in out
-    assert "┴" in out
+    assert "┬" in out
     assert "└─" in out  # detour row corner
 
 
