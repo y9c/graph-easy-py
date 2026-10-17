@@ -28,6 +28,11 @@ def main(argv: list[str] | None = None) -> int:
         help="use plain ASCII box/line characters (default: Unicode)",
     )
     ap.add_argument(
+        "--autolabel",
+        action="store_true",
+        help="label every unlabelled edge (e.g. 'A -> B')",
+    )
+    ap.add_argument(
         "--color",
         nargs="?",
         const="on",
@@ -96,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
         args.color = True
     else:
         args.color = False
-    output = render(graph, ascii_style=args.ascii, color=args.color)
+    output = render(graph, ascii_style=args.ascii, color=args.color, autolabel=args.autolabel)
     sys.stdout.write(output + "\n")
     return 0
 

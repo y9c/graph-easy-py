@@ -472,6 +472,20 @@ def test_cli_dot_output(tmp_path, capsys):
     assert '"A" -> "B"' in out
 
 
+def test_autolabel_labels_unlabelled_edges():
+    # autolabel labels every edge without an explicit label; off by default
+    g = parse_graph("[ A ] --> [ B ]\n[ B ] --> [ C ]")
+    # default: no auto labels
+    out_default = render(g)
+    assert "A -> B" not in out_default and "B -> C" not in out_default
+    # with autolabel: edges get source -> target labels
+    out_auto = render(g, autolabel=True)
+    assert "A -> B" in out_auto or "A ->" in out_auto
+    # an explicitly-labelled edge is left intact
+    g2 = parse_graph("[ A ] -- { label: keep; } --> [ B ]")
+    assert render(g2, autolabel=True).count("keep") >= 1
+
+
 def test_bent_edge_does_not_clobber_unrelated_node_border():
     # issue #5: B -> C must not run its vertical along Longest's right
     # border. Longest is a leaf; its box border must stay intact (no fused

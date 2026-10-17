@@ -1074,10 +1074,20 @@ def _draw_selfloop(
         cv.put_label(x0, x0 + w, gap_row + 1, e.label)
 
 
-def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> str:
+def render(
+    graph: Graph,
+    *,
+    ascii_style: bool = False,
+    color: bool = False,
+    autolabel: bool = False,
+) -> str:
     """Render the graph to multi-line ASCII/Unicode text (no trailing newline)."""
     if not graph.nodes:
         return ""
+    if autolabel:
+        for e in graph.edges:
+            if not e.label:
+                e.label = f"{e.source} -> {e.target}"
     cs = _CharSet.make(ascii_style)
     bands: list[str] = []
     for comp in _components(graph):
