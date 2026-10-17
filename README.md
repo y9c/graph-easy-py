@@ -1,5 +1,8 @@
 # graph-easy
 
+[![PyPI version](https://img.shields.io/pypi/v/graph-easy.svg)](https://pypi.org/project/graph-easy/)
+[![Downloads](https://static.pepy.tech/badge/graph-easy)](https://pepy.tech/project/graph-easy)
+
 A **Python port** of [Graph::Easy](https://github.com/ironcamel/Graph-Easy),
 the Perl tool that lays out directed/undirected graphs and renders them as
 **ASCII art** (box-and-wire diagrams rendered in the terminal).
