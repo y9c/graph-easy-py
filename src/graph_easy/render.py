@@ -375,6 +375,22 @@ def _bg_sgr(name: str, scheme: str | None = None) -> str:
     return f"48;2;{r};{g};{b}"
 
 
+_TEXT_STYLES: dict[str, str] = {
+    "bold": "1",
+    "italic": "3",
+    "underline": "4",
+    "strike": "9",
+}
+
+
+def _text_style_sgr(style: str) -> str:
+    """Return the SGR parameter for a text style ('' if unknown)."""
+    v = style.strip().lower().replace("-", "")
+    if v in _TEXT_STYLES:
+        return _TEXT_STYLES[v]
+    return ""
+
+
 @dataclass
 class _CharSet:
     """One output charset: box chars, line styles, arrows, join tables."""
@@ -552,6 +568,7 @@ def _apply_color(cv: _Canvas, pos: dict, graph: Graph) -> None:
             for c in (
                 _bg_sgr(node.attrs.get("fill", ""), scheme),
                 _fg_sgr(node.attrs.get("color", ""), scheme),
+                _text_style_sgr(node.attrs.get("text-style", "")),
             )
             if c
         ]

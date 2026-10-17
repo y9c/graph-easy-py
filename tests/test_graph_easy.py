@@ -319,6 +319,16 @@ def test_unknown_colour_survives_render():
     assert "│ A │" in out
 
 
+def test_text_style_bold_and_italic():
+    # text-style maps to ANSI SGR when colour is enabled and is silent otherwise
+    out = render(parse_graph("[ A ] { text-style: bold; } --> [ B ]"), color=True)
+    assert "\x1b[1m" in out  # bold
+    out2 = render(parse_graph("[ A ] { text-style: italic; } --> [ B ]"), color=True)
+    assert "\x1b[3m" in out2  # italic
+    out3 = render(parse_graph("[ A ] { text-style: bold; } --> [ B ]"))
+    assert "\x1b[" not in out3  # no ANSI when colour is off
+
+
 # ---- routing regressions ----------------------------------------------------
 
 
