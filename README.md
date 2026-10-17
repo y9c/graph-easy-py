@@ -46,7 +46,8 @@ Actively-developed port. Currently implemented:
 - **Edge line styles**: `--` solid, `..` dotted, `==` double, `~~` wave,
   `##` bold, `.-`/`..-` dot-dash
 - **Edge labels** float next to the line (truncated to fit); `label-pos`
-  can place them above (default) or below
+  can place them above (default) or below; `--autolabel` tags unlabelled
+  edges as `source -> target`
 - **Two output charsets**: Unicode box-drawing by default, plain ASCII via
   `--ascii`
 - **Colours**: `fill`/`color`, `border-color`, and a ColourBrewer palette
