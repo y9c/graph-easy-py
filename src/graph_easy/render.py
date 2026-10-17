@@ -703,9 +703,10 @@ def _draw_detour(
         # detour row, up into the channel left of the target column.
         x_exit = colx[col_s] + col_w[col_s] + _CHANNEL // 2
         cx_t = colx[col_t - 1] + col_w[col_t - 1] + _CHANNEL // 2
-        cv.hline(sx, x_exit - 1, sy_exit, hch, cs)
-        cv.merge(x_exit, sy_exit, hch, L | D, cs)
-        cv.vline(sy_exit + 1, r - 1, x_exit, vch, cs)
+        y_exit = sy0 + sh // 2  # exit from the source's centre row
+        cv.hline(sx, x_exit - 1, y_exit, hch, cs)
+        cv.merge(x_exit, y_exit, hch, L | D, cs)
+        cv.vline(y_exit + 1, r - 1, x_exit, vch, cs)
         cv.merge(x_exit, r, hch, U | R, cs)
         cv.hline(x_exit + 1, cx_t - 1, r, hch, cs)
         cv.merge(cx_t, r, hch, L | U, cs)
@@ -715,7 +716,7 @@ def _draw_detour(
         if e.directed_to_target:
             cv.set(tx - 1, ty_mid, ar)
         if e.directed_from_source:
-            cv.set(sx, sy_exit, al)
+            cv.set(sx, y_exit, al)
         if e.label:
             cv.put_label(x_exit + 1, cx_t - 1, r, e.label)
 
