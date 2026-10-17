@@ -445,3 +445,76 @@ def test_wide_char_kernel_widths():
     assert Node(label="abc").inner_width() == 3
     assert Node(label="とうきょう").inner_width() == 10  # 5 hiragana * 2 cells
     assert Node(label="東京").inner_width() == 4
+
+
+# ---- border-opaque regression (wire must not punch through a box frame) ----
+
+
+def _box_border_junctions(text):
+    """Return (node, x, y, glyph) if a junction glyph sits on a box border."""
+    import importlib
+
+    from graph_easy._width import display_width
+
+    R = importlib.import_module("graph_easy.render")
+    g = parse_graph(text)
+    out = render(g)
+    lines = out.splitlines()
+    comp = R._components(g)[0]
+    layers = R._barycenter_order(R._layers(comp, g), g)
+    layer_boxes = [[R._box(g.nodes[node], R._BOX_UNICODE) for node in layer] for layer in layers]
+    col_w = [max(max(display_width(row) for row in b) for b in bxs) for bxs in layer_boxes]
+    colx = []
+    x = 0
+    for w in col_w:
+        colx.append(x)
+        x += w + R._CHANNEL
+    y_offs = []
+    for c, bxs in enumerate(layer_boxes):
+        offs = []
+        y = 0
+        for b, _node in zip(bxs, layers[c], strict=True):
+            offs.append(y)
+            y += len(b) + 1
+        y_offs.append(offs)
+    for c, bxs in enumerate(layer_boxes):
+        for i, b in enumerate(bxs):
+            x0, y0 = colx[c], y_offs[c][i]
+            w = display_width(b[0])
+            h = len(b)
+            for yy in (y0, y0 + h - 1):
+                for xx in range(x0, x0 + w):
+                    if yy < len(lines) and xx < len(lines[yy]):
+                        ch = lines[yy][xx]
+                        if ch in "\u253c\u252c\u2534\u2524\u251c":
+                            return (layers[c][i], xx, yy, ch)
+    return None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "[ C ] --> [ B ]\n[ B ] --> [ D ]\n[ B ] --> [ C ]",
+        "[ B ] --> [ Longest ]\n[ C ] --> [ B ]\n[ B ] --> [ X ]\n[ B ] --> [ C ]",
+        "[ A ] --> [ B ]\n[ B ] --> [ C ]\n[ C ] --> [ D ]\n[ D ] --> [ B ]",
+        "[ X ] --> [ B ]\n[ D ] --> [ X ]\n[ B ] --> [ D ]\n[ C ] --> [ X ]",
+    ],
+)
+def test_wire_never_punches_through_box_border(text):
+    # A wire routed past an unrelated node must not merge with its frame
+    # (which would turn a box border into a junction glyph and fabricate a
+    # false edge).
+    assert _box_border_junctions(text) is None
+
+
+def test_forward_detour_exits_source_centre():
+    # A span edge degraded to a detour must leave the source from its centre
+    # row, not its bottom border (otherwise a multi-out-edge node draws a
+    # branch from its corner).
+    out = render(parse_graph("[ B ] --> [ C ]\n[ B ] --> [ X ]\n[ C ] --> [ X ]\n[D] --> [B]"))
+    lines = out.splitlines()
+    by = next(i for i, line in enumerate(lines) if "\u2502 B \u2502" in line)
+    bx = lines[by].index("\u2502 B \u2502") + len("\u2502 B \u2502")
+    assert lines[by][bx] == "\u2500"
+    # the box bottom border is not extended with a rightward wire
+    assert "\u2514\u2500\u2500\u2500\u2518\u2500\u2500" not in lines[by + 1]
