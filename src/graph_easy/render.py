@@ -419,6 +419,7 @@ class _Route:
     kind: str  # straight | backstraight | adjacentz | spanz | backz | detour | selfloop
     detour_y: int = 0
     x_exit: int | None = None  # exit column for back-edge detours
+    cx: int | None = None  # bend column for adjacent-layer Z edges
 
 
 def _plan_routes(
@@ -451,8 +452,25 @@ def _plan_routes(
         if t == s + 1:
             if sy_mid == ty_mid:
                 routes.append(_Route(e, "straight"))
+                continue
+            # Adjacent-layer Z edge: bend through the channel between the
+            # source and target columns. The channel centre is box-free by
+            # construction, unlike a midpoint between the source's actual
+            # right edge and the target's left edge (which can land on an
+            # unrelated node's border when a wide sibling shares the layer).
+            cx_s = colx[s] + col_w[s] + _CHANNEL // 2
+            if (
+                cx_s > sx
+                and cv.row_clear(sx, cx_s - 1, sy_mid)
+                and cv.col_clear(
+                    min(sy_mid, ty_mid) + 1, max(sy_mid, ty_mid) - 1, cx_s
+                )
+                and cv.row_clear(cx_s + 1, tx - 1, ty_mid)
+            ):
+                routes.append(_Route(e, "adjacentz", cx=cx_s))
             else:
-                routes.append(_Route(e, "adjacentz"))
+                routes.append(_Route(e, "detour", detour_y))
+                detour_y += 1
             continue
         if sy_mid == ty_mid:
             span = (txr, sx - 1) if t < s else (sx, tx - 1)
@@ -784,7 +802,7 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
                     back=True,
                 )
             elif route.kind == "adjacentz":
-                cx = (sx + tx) // 2 if tx - sx > _CHANNEL else sx + _CHANNEL // 2
+                cx = route.cx if route.cx is not None else colx[s] + col_w[s] + _CHANNEL // 2
                 _draw_z(
                     cv, e, cs,
                     sx=sx, y1=sy_mid, cx=cx, tx_border=tx, y2=ty_mid,
