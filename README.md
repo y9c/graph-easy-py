@@ -45,7 +45,8 @@ Actively-developed port. Currently implemented:
   stack as separate diagrams
 - **Edge line styles**: `--` solid, `..` dotted, `==` double, `~~` wave,
   `##` bold, `.-`/`..-` dot-dash
-- **Edge labels** float next to the line (truncated to fit)
+- **Edge labels** float next to the line (truncated to fit); `label-pos`
+  can place them above (default) or below
 - **Two output charsets**: Unicode box-drawing by default, plain ASCII via
   `--ascii`
 - **Colours**: `fill`/`color`, `border-color`, and a ColourBrewer palette
