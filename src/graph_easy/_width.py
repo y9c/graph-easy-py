@@ -46,9 +46,3 @@ def truncate_display(text: str, budget: int) -> str:
         out.append(ch)
         used += w
     return "".join(out)
-
-
-def pad_display(text: str, target: int) -> str:
-    """Right-pad ``text`` with spaces so its width is at least ``target`` cells."""
-    pad = target - display_width(text)
-    return text + " " * max(pad, 0)
