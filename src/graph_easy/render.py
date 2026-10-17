@@ -182,6 +182,11 @@ class _Canvas:
         self.width = width
         self.height = height
         self.cells: list[list[str]] = [[" "] * width for _ in range(height)]
+        # Set of (x, y) cells occupied by a node's box border. Border cells
+        # are opaque to line drawing: a wire must never overwrite or merge
+        # with a box frame, or it would punch through (e.g. turn a ─ border
+        # into ┼) and fabricate an edge.
+        self.border: set[tuple[int, int]] = set()
 
     def get(self, x: int, y: int) -> str:
         if 0 <= y < self.height and 0 <= x < self.width:
@@ -211,6 +216,11 @@ class _Canvas:
         Opaque cells (box frames, labels, arrowheads) are never clobbered.
         """
         if not (0 <= y < self.height and 0 <= x < self.width):
+            return
+        # Box borders are opaque: a line must never merge with (and thus
+        # punch through) a node's frame. The border is drawn/owned by the
+        # box; an edge reaches it via the arrowhead placed just outside.
+        if (x, y) in self.border:
             return
         cur = self.cells[y][x]
         if cur == " " or cur == _WIDE_CONT:
@@ -795,12 +805,18 @@ def render(graph: Graph, *, ascii_style: bool = False, color: bool = False) -> s
         for c, boxes in enumerate(layer_boxes):
             for i, b in enumerate(boxes):
                 x0, y0 = colx[c], y_offs[c][i] + pad
+                h = len(b)
+                w = display_width(b[0])
                 for r, row in enumerate(b):
                     cc = 0
                     for ch in row:
-                        cv.set(x0 + cc, y0 + r, ch)
+                        cx = x0 + cc
+                        cv.set(cx, y0 + r, ch)
+                        # record opaque border ring (top/bottom cols, sides)
+                        if r in (0, h - 1) or cc in (0, display_width(row) - 1):
+                            cv.border.add((cx, y0 + r))
                         cc += display_width(ch)
-                pos[layers[c][i]] = (x0, y0, display_width(b[0]), len(b))
+                pos[layers[c][i]] = (x0, y0, w, h)
 
         edges = _comp_edges(comp, graph)
         layer_of = {n: c for c, layer in enumerate(layers) for n in layer}
