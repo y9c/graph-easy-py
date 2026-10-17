@@ -262,6 +262,13 @@ def test_default_arrowhead_is_filled_triangle():
     assert ">" in out2 and "▶" not in out2
 
 
+def test_arrow_style_plain_and_open():
+    # arrow-style is an alias of arrowshape; plain/open/line -> ASCII heads
+    for style in ("plain", "open", "line"):
+        out = render(parse_graph(f"[ A ] -- {{ arrow-style: {style}; }} --> [ B ]"))
+        assert ">" in out and "▶" not in out
+
+
 def test_color_attrs_when_enabled():
     g = parse_graph("[ A ] { fill: red; color: white; } --> [ B ]")
     out = render(g, color=True)

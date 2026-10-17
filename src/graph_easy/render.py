@@ -850,8 +850,13 @@ def _plan_routes(
 
 
 def _get_arrows(cs: _CharSet, e: Edge) -> tuple[str, str, str]:
-    """Get arrowhead characters, respecting 'arrowshape: plain'."""
-    if e.attrs.get("arrowshape") == "plain":
+    """Get arrowhead characters, respecting ``arrow-style``/``arrowshape``.
+
+    ``plain``/``open``/``line`` use the ASCII ``>``/``<``/``^`` heads; anything
+    else (the default, ``filled``) uses the Unicode filled triangle.
+    """
+    style = e.attrs.get("arrow-style", e.attrs.get("arrowshape", "filled"))
+    if style in ("plain", "open", "line"):
         return (">", "<", "^")
     return (cs.ar, cs.al, cs.ar_up)
 
